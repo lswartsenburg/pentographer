@@ -19,7 +19,9 @@ function StatusBadge({ status }: { status: string }) {
     complete: "Complete",
   };
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${styles[status] ?? "bg-muted text-muted-foreground"}`}>
+    <span
+      className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${styles[status] ?? "bg-muted text-muted-foreground"}`}
+    >
       {labels[status] ?? status}
     </span>
   );
@@ -57,12 +59,7 @@ export default async function DashboardPage() {
     const [highStats] = await db
       .select({ total: count() })
       .from(finding)
-      .where(
-        and(
-          inArray(finding.projectId, projectIds),
-          eq(finding.riskLevel, "high")
-        )
-      );
+      .where(and(inArray(finding.projectId, projectIds), eq(finding.riskLevel, "high")));
 
     highRiskFindings = highStats?.total ?? 0;
   }
@@ -117,7 +114,9 @@ export default async function DashboardPage() {
         {/* Recent projects */}
         <div className="bg-card border border-border rounded-lg overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recent projects</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Recent projects
+            </p>
           </div>
           {recentProjects.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
@@ -130,17 +129,31 @@ export default async function DashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Project</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Customer</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Status</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Findings</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Project
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Customer
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Status
+                  </th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Findings
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {recentProjects.map((p) => (
-                  <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <tr
+                    key={p.id}
+                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                  >
                     <td className="px-4 py-3">
-                      <Link href={`/projects/${p.id}`} className="font-medium text-foreground hover:text-primary">
+                      <Link
+                        href={`/projects/${p.id}`}
+                        className="font-medium text-foreground hover:text-primary"
+                      >
                         {p.name}
                       </Link>
                     </td>

@@ -24,7 +24,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const [pb] = await db
     .select()
     .from(playbook)
-    .where(and(eq(playbook.id, id), or(eq(playbook.userId, session!.user.id), isNull(playbook.userId))))
+    .where(
+      and(eq(playbook.id, id), or(eq(playbook.userId, session!.user.id), isNull(playbook.userId)))
+    )
     .limit(1);
 
   if (!pb) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -72,7 +74,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .orderBy(desc(playbookVersion.createdAt))
     .limit(1);
 
-  if (!latestVersion) return NextResponse.json({ error: "No existing version to clone from" }, { status: 400 });
+  if (!latestVersion)
+    return NextResponse.json({ error: "No existing version to clone from" }, { status: 400 });
 
   const newVersionNumber = bumpVersion(latestVersion.version);
 
@@ -104,10 +107,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       })
       .returning();
 
-    const items = await db
-      .select()
-      .from(playbookItem)
-      .where(eq(playbookItem.categoryId, cat.id));
+    const items = await db.select().from(playbookItem).where(eq(playbookItem.categoryId, cat.id));
 
     if (items.length > 0) {
       await db.insert(playbookItem).values(

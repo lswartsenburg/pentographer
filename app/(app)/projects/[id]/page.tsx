@@ -2,7 +2,15 @@ import { auth } from "@/auth";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db/client";
-import { project, customer, playbookVersion, playbook, finding, executiveSummaryVersion, auditLog } from "@/db/schema";
+import {
+  project,
+  customer,
+  playbookVersion,
+  playbook,
+  finding,
+  executiveSummaryVersion,
+  auditLog,
+} from "@/db/schema";
 import { eq, and, desc, count } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { IconDownload, IconPlus, IconSparkles } from "@tabler/icons-react";
@@ -20,7 +28,9 @@ function StatusBadge({ status }: { status: string }) {
     complete: "Complete",
   };
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${styles[status] ?? "bg-muted text-muted-foreground"}`}>
+    <span
+      className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${styles[status] ?? "bg-muted text-muted-foreground"}`}
+    >
       {labels[status] ?? status}
     </span>
   );
@@ -107,7 +117,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between border-b border-border h-12 px-5 bg-background">
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link href="/projects" className="hover:text-foreground">Projects</Link>
+          <Link href="/projects" className="hover:text-foreground">
+            Projects
+          </Link>
           <span>/</span>
           <span className="text-foreground font-medium">{proj.customerName ?? "Project"}</span>
           <span>/</span>
@@ -151,7 +163,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <div>
                 <p className="text-[11px] text-muted-foreground mb-0.5">Start date</p>
                 <p className="text-foreground">
-                  {new Date(proj.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  {new Date(proj.startDate).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
                 </p>
               </div>
             )}
@@ -159,14 +175,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <div>
                 <p className="text-[11px] text-muted-foreground mb-0.5">End date</p>
                 <p className="text-foreground">
-                  {new Date(proj.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  {new Date(proj.endDate).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
                 </p>
               </div>
             )}
 
             {/* Risk summary */}
             <div className="pt-2 border-t border-border">
-              <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wide font-medium">Risk summary</p>
+              <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wide font-medium">
+                Risk summary
+              </p>
               <div className="grid grid-cols-3 gap-1.5">
                 <div className="bg-[#FCEBEB] rounded-md p-2 text-center">
                   <p className="text-lg font-semibold text-[#A32D2D]">{highCount?.c ?? 0}</p>
@@ -196,7 +218,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               status: f.status,
               isAdhoc: f.isAdhoc,
             }))}
-            latestExecSummary={latestExecSummary ? { content: latestExecSummary.content, createdAt: latestExecSummary.createdAt.toISOString() } : null}
+            latestExecSummary={
+              latestExecSummary
+                ? {
+                    content: latestExecSummary.content,
+                    createdAt: latestExecSummary.createdAt.toISOString(),
+                  }
+                : null
+            }
             execSummaryHistory={execSummaryHistory.map((v) => ({
               id: v.id,
               authorType: v.authorType,

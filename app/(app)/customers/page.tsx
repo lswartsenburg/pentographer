@@ -48,24 +48,42 @@ export default async function CustomersPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Name</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Contact email</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">Projects</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Added</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Name
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Contact email
+                  </th>
+                  <th className="text-right px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Projects
+                  </th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">
+                    Added
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {customers.map((c) => (
-                  <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <tr
+                    key={c.id}
+                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                  >
                     <td className="px-4 py-3">
-                      <Link href={`/customers/${c.id}`} className="font-medium text-foreground hover:text-primary">
+                      <Link
+                        href={`/customers/${c.id}`}
+                        className="font-medium text-foreground hover:text-primary"
+                      >
                         {c.name}
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{c.contactEmail ?? "—"}</td>
                     <td className="px-4 py-3 text-right text-muted-foreground">{c.projectCount}</td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(c.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      {new Date(c.createdAt).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </td>
                   </tr>
                 ))}

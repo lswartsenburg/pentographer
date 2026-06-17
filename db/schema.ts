@@ -13,12 +13,7 @@ import { relations } from "drizzle-orm";
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
-export const riskLevelEnum = pgEnum("risk_level", [
-  "high",
-  "medium",
-  "low",
-  "informational",
-]);
+export const riskLevelEnum = pgEnum("risk_level", ["high", "medium", "low", "informational"]);
 
 export const findingStatusEnum = pgEnum("finding_status", [
   "draft",
@@ -108,10 +103,9 @@ export const project = pgTable("project", {
   customerId: uuid("customer_id")
     .notNull()
     .references(() => customer.id, { onDelete: "restrict" }),
-  playbookVersionId: uuid("playbook_version_id").references(
-    () => playbookVersion.id,
-    { onDelete: "restrict" }
-  ),
+  playbookVersionId: uuid("playbook_version_id").references(() => playbookVersion.id, {
+    onDelete: "restrict",
+  }),
   name: text("name").notNull(),
   status: projectStatusEnum("status").notNull().default("in_progress"),
   scope: text("scope"),
@@ -201,26 +195,38 @@ export const playbookVersionRelations = relations(playbookVersion, ({ one, many 
 }));
 
 export const playbookCategoryRelations = relations(playbookCategory, ({ one, many }) => ({
-  playbookVersion: one(playbookVersion, { fields: [playbookCategory.playbookVersionId], references: [playbookVersion.id] }),
+  playbookVersion: one(playbookVersion, {
+    fields: [playbookCategory.playbookVersionId],
+    references: [playbookVersion.id],
+  }),
   items: many(playbookItem),
 }));
 
 export const playbookItemRelations = relations(playbookItem, ({ one, many }) => ({
-  category: one(playbookCategory, { fields: [playbookItem.categoryId], references: [playbookCategory.id] }),
+  category: one(playbookCategory, {
+    fields: [playbookItem.categoryId],
+    references: [playbookCategory.id],
+  }),
   findings: many(finding),
 }));
 
 export const projectRelations = relations(project, ({ one, many }) => ({
   user: one(userAccount, { fields: [project.userId], references: [userAccount.id] }),
   customer: one(customer, { fields: [project.customerId], references: [customer.id] }),
-  playbookVersion: one(playbookVersion, { fields: [project.playbookVersionId], references: [playbookVersion.id] }),
+  playbookVersion: one(playbookVersion, {
+    fields: [project.playbookVersionId],
+    references: [playbookVersion.id],
+  }),
   findings: many(finding),
   executiveSummaryVersions: many(executiveSummaryVersion),
 }));
 
 export const findingRelations = relations(finding, ({ one, many }) => ({
   project: one(project, { fields: [finding.projectId], references: [project.id] }),
-  playbookItem: one(playbookItem, { fields: [finding.playbookItemId], references: [playbookItem.id] }),
+  playbookItem: one(playbookItem, {
+    fields: [finding.playbookItemId],
+    references: [playbookItem.id],
+  }),
   versions: many(findingVersion),
 }));
 

@@ -172,7 +172,8 @@ export function ReportDocument({
 
         <View style={styles.infoBox}>
           <Text style={{ fontSize: 9, color: "#555" }}>
-            CONFIDENTIAL — This report contains sensitive security findings. Distribution is restricted to intended recipients only.
+            CONFIDENTIAL — This report contains sensitive security findings. Distribution is
+            restricted to intended recipients only.
           </Text>
         </View>
 
@@ -195,7 +196,12 @@ export function ReportDocument({
         <Text style={styles.h1}>Risk Summary</Text>
         <View style={styles.summaryTable}>
           {(["high", "medium", "low", "informational"] as RiskLevel[]).map((r) => {
-            const counts = { high: highCount, medium: medCount, low: lowCount, informational: infoCount };
+            const counts = {
+              high: highCount,
+              medium: medCount,
+              low: lowCount,
+              informational: infoCount,
+            };
             return (
               <View key={r} style={[styles.summaryCell, { backgroundColor: riskBg[r] }]}>
                 <Text style={[styles.summaryCellValue, { color: riskColors[r] }]}>{counts[r]}</Text>
@@ -222,7 +228,9 @@ export function ReportDocument({
                 </Text>
               </View>
               {f.cvssScore && (
-                <Text style={{ fontSize: 9, color: "#555", marginRight: 8 }}>CVSS {f.cvssScore}</Text>
+                <Text style={{ fontSize: 9, color: "#555", marginRight: 8 }}>
+                  CVSS {f.cvssScore}
+                </Text>
               )}
               <Text style={{ fontSize: 9, color: "#555" }}>{f.status}</Text>
             </View>

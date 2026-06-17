@@ -14,12 +14,7 @@ async function getAccessiblePlaybook(userId: string, id: string) {
   const [row] = await db
     .select()
     .from(playbook)
-    .where(
-      and(
-        eq(playbook.id, id),
-        or(eq(playbook.userId, userId), isNull(playbook.userId))
-      )
-    )
+    .where(and(eq(playbook.id, id), or(eq(playbook.userId, userId), isNull(playbook.userId))))
     .limit(1);
   return row ?? null;
 }

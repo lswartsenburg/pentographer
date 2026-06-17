@@ -1,50 +1,253 @@
-
 <style>
-.screen { font-family: var(--font-sans); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; background: var(--color-background-tertiary); }
-.topbar { background: var(--color-background-primary); border-bottom: 0.5px solid var(--color-border-tertiary); padding: 11px 20px; display: flex; align-items: center; justify-content: space-between; }
-.breadcrumb { font-size: 12px; color: var(--color-text-tertiary); }
-.breadcrumb span { color: var(--color-text-primary); font-weight: 500; }
-.btn { font-size: 12px; padding: 5px 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-.btn-primary { background: #185FA5; border-color: #185FA5; color: #fff; }
-.btn-ai { background: #EEEDFE; border-color: #AFA9EC; color: #3C3489; }
-.body { display: flex; height: 580px; }
-.left-panel { width: 240px; flex-shrink: 0; background: var(--color-background-primary); border-right: 0.5px solid var(--color-border-tertiary); overflow-y: auto; }
-.panel-header { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 0.5px solid var(--color-border-tertiary); }
-.panel-title { font-size: 12px; font-weight: 500; color: var(--color-text-primary); }
-.version-pill { font-size: 11px; background: var(--color-background-info); color: #0C447C; border-radius: 99px; padding: 2px 8px; }
-.category { border-bottom: 0.5px solid var(--color-border-tertiary); }
-.category-header { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer; background: var(--color-background-secondary); }
-.category-header:hover { background: var(--color-background-tertiary); }
-.category-name { font-size: 12px; font-weight: 500; color: var(--color-text-primary); flex: 1; }
-.category-count { font-size: 10px; color: var(--color-text-tertiary); }
-.item-row { display: flex; align-items: center; gap: 8px; padding: 7px 12px 7px 26px; cursor: pointer; border-bottom: 0.5px solid var(--color-border-tertiary); }
-.item-row:hover { background: var(--color-background-secondary); }
-.item-row.active { background: #E6F1FB; }
-.item-name { font-size: 12px; color: var(--color-text-primary); flex: 1; }
-.item-row.active .item-name { color: #0C447C; font-weight: 500; }
-.badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 99px; font-weight: 500; flex-shrink: 0; }
-.badge-high { background: #FCEBEB; color: #A32D2D; }
-.badge-med { background: #FAEEDA; color: #633806; }
-.badge-low { background: #EAF3DE; color: #27500A; }
-.add-item { padding: 7px 12px 7px 26px; font-size: 11px; color: var(--color-text-tertiary); cursor: pointer; display: flex; align-items: center; gap: 5px; }
-.add-item:hover { color: var(--color-text-secondary); }
-.add-category { padding: 10px 12px; font-size: 11px; color: var(--color-text-tertiary); cursor: pointer; display: flex; align-items: center; gap: 5px; }
-.main { flex: 1; padding: 18px 22px; overflow-y: auto; }
-.item-title { font-size: 15px; font-weight: 500; color: var(--color-text-primary); margin: 0 0 16px; border-bottom: 0.5px solid var(--color-border-tertiary); padding-bottom: 12px; }
-.field-row { display: flex; gap: 12px; margin-bottom: 14px; }
-.field { flex: 1; }
-.field-label { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px; }
-.select-mock { font-size: 12px; padding: 6px 10px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); color: var(--color-text-primary); background: var(--color-background-primary); display: flex; align-items: center; justify-content: space-between; }
-.text-area-mock { font-size: 12px; padding: 8px 10px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); color: var(--color-text-primary); background: var(--color-background-primary); line-height: 1.6; font-family: var(--font-mono); min-height: 90px; }
-.section-label { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 8px; }
-.toggle-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--color-text-primary); margin-bottom: 8px; }
-.toggle { width: 30px; height: 17px; background: #185FA5; border-radius: 99px; position: relative; }
-.toggle-dot { width: 13px; height: 13px; background: #fff; border-radius: 50%; position: absolute; top: 2px; right: 2px; }
+  .screen {
+    font-family: var(--font-sans);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    background: var(--color-background-tertiary);
+  }
+  .topbar {
+    background: var(--color-background-primary);
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    padding: 11px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .breadcrumb {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+  }
+  .breadcrumb span {
+    color: var(--color-text-primary);
+    font-weight: 500;
+  }
+  .btn {
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .btn-primary {
+    background: #185fa5;
+    border-color: #185fa5;
+    color: #fff;
+  }
+  .btn-ai {
+    background: #eeedfe;
+    border-color: #afa9ec;
+    color: #3c3489;
+  }
+  .body {
+    display: flex;
+    height: 580px;
+  }
+  .left-panel {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--color-background-primary);
+    border-right: 0.5px solid var(--color-border-tertiary);
+    overflow-y: auto;
+  }
+  .panel-header {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+  }
+  .panel-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+  }
+  .version-pill {
+    font-size: 11px;
+    background: var(--color-background-info);
+    color: #0c447c;
+    border-radius: 99px;
+    padding: 2px 8px;
+  }
+  .category {
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+  }
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    cursor: pointer;
+    background: var(--color-background-secondary);
+  }
+  .category-header:hover {
+    background: var(--color-background-tertiary);
+  }
+  .category-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    flex: 1;
+  }
+  .category-count {
+    font-size: 10px;
+    color: var(--color-text-tertiary);
+  }
+  .item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px 7px 26px;
+    cursor: pointer;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+  }
+  .item-row:hover {
+    background: var(--color-background-secondary);
+  }
+  .item-row.active {
+    background: #e6f1fb;
+  }
+  .item-name {
+    font-size: 12px;
+    color: var(--color-text-primary);
+    flex: 1;
+  }
+  .item-row.active .item-name {
+    color: #0c447c;
+    font-weight: 500;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 99px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .badge-high {
+    background: #fcebeb;
+    color: #a32d2d;
+  }
+  .badge-med {
+    background: #faeeda;
+    color: #633806;
+  }
+  .badge-low {
+    background: #eaf3de;
+    color: #27500a;
+  }
+  .add-item {
+    padding: 7px 12px 7px 26px;
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .add-item:hover {
+    color: var(--color-text-secondary);
+  }
+  .add-category {
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .main {
+    flex: 1;
+    padding: 18px 22px;
+    overflow-y: auto;
+  }
+  .item-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    margin: 0 0 16px;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    padding-bottom: 12px;
+  }
+  .field-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .field {
+    flex: 1;
+  }
+  .field-label {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    margin-bottom: 4px;
+  }
+  .select-mock {
+    font-size: 12px;
+    padding: 6px 10px;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    color: var(--color-text-primary);
+    background: var(--color-background-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .text-area-mock {
+    font-size: 12px;
+    padding: 8px 10px;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    color: var(--color-text-primary);
+    background: var(--color-background-primary);
+    line-height: 1.6;
+    font-family: var(--font-mono);
+    min-height: 90px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 16px 0 8px;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--color-text-primary);
+    margin-bottom: 8px;
+  }
+  .toggle {
+    width: 30px;
+    height: 17px;
+    background: #185fa5;
+    border-radius: 99px;
+    position: relative;
+  }
+  .toggle-dot {
+    width: 13px;
+    height: 13px;
+    background: #fff;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    right: 2px;
+  }
 </style>
 <div class="screen">
   <div class="topbar">
     <div class="breadcrumb">Playbooks / <span>OWASP Top 10</span></div>
-    <div style="display:flex; gap:6px;">
+    <div style="display: flex; gap: 6px">
       <div class="btn btn-ai"><i class="ti ti-sparkles" aria-hidden="true"></i> AI generate</div>
       <div class="btn"><i class="ti ti-git-branch" aria-hidden="true"></i> New version</div>
       <div class="btn btn-primary"><i class="ti ti-device-floppy" aria-hidden="true"></i> Save</div>
@@ -59,7 +262,11 @@
 
       <div class="category">
         <div class="category-header">
-          <i class="ti ti-chevron-down" style="font-size:12px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+          <i
+            class="ti ti-chevron-down"
+            style="font-size: 12px; color: var(--color-text-tertiary)"
+            aria-hidden="true"
+          ></i>
           <span class="category-name">A01 Broken access control</span>
           <span class="category-count">3</span>
         </div>
@@ -80,7 +287,11 @@
 
       <div class="category">
         <div class="category-header">
-          <i class="ti ti-chevron-down" style="font-size:12px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+          <i
+            class="ti ti-chevron-down"
+            style="font-size: 12px; color: var(--color-text-tertiary)"
+            aria-hidden="true"
+          ></i>
           <span class="category-name">A03 Injection</span>
           <span class="category-count">4</span>
         </div>
@@ -105,7 +316,11 @@
 
       <div class="category">
         <div class="category-header">
-          <i class="ti ti-chevron-right" style="font-size:12px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+          <i
+            class="ti ti-chevron-right"
+            style="font-size: 12px; color: var(--color-text-tertiary)"
+            aria-hidden="true"
+          ></i>
           <span class="category-name">A07 Auth failures</span>
           <span class="category-count">5</span>
         </div>
@@ -113,7 +328,11 @@
 
       <div class="category">
         <div class="category-header">
-          <i class="ti ti-chevron-right" style="font-size:12px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+          <i
+            class="ti ti-chevron-right"
+            style="font-size: 12px; color: var(--color-text-tertiary)"
+            aria-hidden="true"
+          ></i>
           <span class="category-name">A09 Logging failures</span>
           <span class="category-count">2</span>
         </div>
@@ -128,19 +347,32 @@
       <div class="field-row">
         <div class="field">
           <div class="field-label">Default risk</div>
-          <div class="select-mock"><span class="badge badge-high">High</span><i class="ti ti-chevron-down" style="font-size:12px;" aria-hidden="true"></i></div>
+          <div class="select-mock">
+            <span class="badge badge-high">High</span
+            ><i class="ti ti-chevron-down" style="font-size: 12px" aria-hidden="true"></i>
+          </div>
         </div>
         <div class="field">
           <div class="field-label">Framework ref</div>
-          <div class="select-mock">A03:2021<i class="ti ti-chevron-down" style="font-size:12px;" aria-hidden="true"></i></div>
+          <div class="select-mock">
+            A03:2021<i class="ti ti-chevron-down" style="font-size: 12px" aria-hidden="true"></i>
+          </div>
         </div>
       </div>
 
       <div class="section-label">Description (what to look for)</div>
-      <div class="text-area-mock">SQL injection vulnerabilities arise when user-controllable data is incorporated into database SQL queries in an unsafe manner. Test all input fields, headers, and URL parameters for injection points. Use tools such as sqlmap to automate discovery.</div>
+      <div class="text-area-mock">
+        SQL injection vulnerabilities arise when user-controllable data is incorporated into
+        database SQL queries in an unsafe manner. Test all input fields, headers, and URL parameters
+        for injection points. Use tools such as sqlmap to automate discovery.
+      </div>
 
       <div class="section-label">Default remediation</div>
-      <div class="text-area-mock">Use parameterized queries (prepared statements) for all database access. Validate and sanitize all user input server-side. Apply the principle of least privilege to database accounts.</div>
+      <div class="text-area-mock">
+        Use parameterized queries (prepared statements) for all database access. Validate and
+        sanitize all user input server-side. Apply the principle of least privilege to database
+        accounts.
+      </div>
 
       <div class="section-label">Settings</div>
       <div class="toggle-row">

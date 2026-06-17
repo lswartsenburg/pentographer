@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { project, customer, finding, findingVersion, executiveSummaryVersion, auditLog } from "@/db/schema";
+import {
+  project,
+  customer,
+  finding,
+  findingVersion,
+  executiveSummaryVersion,
+  auditLog,
+} from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { generateDocx } from "@/lib/export/word";
 import { generatePdf } from "@/lib/export/pdf";
@@ -11,10 +18,7 @@ const exportSchema = z.object({
   format: z.enum(["docx", "pdf"]),
 });
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
   if (error) return error;
   const { id: projectId } = await params;
@@ -46,10 +50,7 @@ export async function POST(
   }
 
   // Load latest version of each finding
-  const findings = await db
-    .select()
-    .from(finding)
-    .where(eq(finding.projectId, projectId));
+  const findings = await db.select().from(finding).where(eq(finding.projectId, projectId));
 
   const findingsWithVersions = await Promise.all(
     findings.map(async (f) => {

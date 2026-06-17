@@ -38,9 +38,36 @@ export function PentographerMark({ size = 64, theme = "light" }: PentographerMar
       <line x1="120" y1="95" x2="120" y2="177" stroke={cut} strokeWidth="3" />
       <path d="M 120 82 L 128 91 L 120 100 L 112 91 Z" fill={cut} />
       <circle cx="120" cy="169" r="3" fill={accent} opacity="0.85" />
-      <line x1="48" y1="88" x2="68" y2="88" stroke={accent} strokeWidth="2.5" strokeOpacity="0.65" strokeLinecap="round" />
-      <line x1="172" y1="88" x2="192" y2="88" stroke={accent} strokeWidth="2.5" strokeOpacity="0.65" strokeLinecap="round" />
-      <line x1="120" y1="32" x2="120" y2="46" stroke={accent} strokeWidth="2" strokeOpacity="0.4" strokeLinecap="round" />
+      <line
+        x1="48"
+        y1="88"
+        x2="68"
+        y2="88"
+        stroke={accent}
+        strokeWidth="2.5"
+        strokeOpacity="0.65"
+        strokeLinecap="round"
+      />
+      <line
+        x1="172"
+        y1="88"
+        x2="192"
+        y2="88"
+        stroke={accent}
+        strokeWidth="2.5"
+        strokeOpacity="0.65"
+        strokeLinecap="round"
+      />
+      <line
+        x1="120"
+        y1="32"
+        x2="120"
+        y2="46"
+        stroke={accent}
+        strokeWidth="2"
+        strokeOpacity="0.4"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

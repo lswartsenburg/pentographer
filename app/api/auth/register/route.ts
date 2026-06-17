@@ -22,7 +22,10 @@ export async function POST(request: NextRequest) {
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid input. Name, a valid email, and a password of at least 8 characters are required." },
+      {
+        error:
+          "Invalid input. Name, a valid email, and a password of at least 8 characters are required.",
+      },
       { status: 400 }
     );
   }

@@ -79,10 +79,11 @@ export function NewFindingForm({ projectId, playbookItems }: NewFindingFormProps
   return (
     <div className="max-w-xl">
       <form onSubmit={handleSubmit} className="space-y-5">
-
         {hasPlaybook && (
           <div className="space-y-1.5">
-            <Label>Playbook item <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <Label>
+              Playbook item <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
             <PlaybookItemCombobox
               items={playbookItems}
               value={selectedItemId}
@@ -138,7 +139,9 @@ export function NewFindingForm({ projectId, playbookItems }: NewFindingFormProps
 
         <div className="flex justify-end gap-2 pt-1">
           <Link href={`/projects/${projectId}`}>
-            <Button type="button" variant="outline">Cancel</Button>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
           </Link>
           <Button type="submit" disabled={loading || !title.trim()}>
             {loading ? "Creating…" : "Create finding"}

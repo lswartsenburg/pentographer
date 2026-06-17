@@ -1,7 +1,14 @@
 import { auth } from "@/auth";
 import { redirect, notFound } from "next/navigation";
 import { db } from "@/db/client";
-import { project, finding, findingVersion, playbookCategory, playbookItem, auditLog } from "@/db/schema";
+import {
+  project,
+  finding,
+  findingVersion,
+  playbookCategory,
+  playbookItem,
+  auditLog,
+} from "@/db/schema";
 import { eq, and, desc, asc, inArray } from "drizzle-orm";
 import { FindingEditor } from "./finding-editor";
 
@@ -16,7 +23,12 @@ export default async function FindingDetailPage({
   const { id: projectId, findingId } = await params;
 
   const [proj] = await db
-    .select({ id: project.id, name: project.name, userId: project.userId, playbookVersionId: project.playbookVersionId })
+    .select({
+      id: project.id,
+      name: project.name,
+      userId: project.userId,
+      playbookVersionId: project.playbookVersionId,
+    })
     .from(project)
     .where(and(eq(project.id, projectId), eq(project.userId, session.user.id)))
     .limit(1);
@@ -66,13 +78,14 @@ export default async function FindingDetailPage({
       .orderBy(asc(playbookCategory.displayOrder));
 
     const categoryIds = categories.map((c) => c.id);
-    const items = categoryIds.length > 0
-      ? await db
-          .select()
-          .from(playbookItem)
-          .where(inArray(playbookItem.categoryId, categoryIds))
-          .orderBy(asc(playbookItem.displayOrder))
-      : [];
+    const items =
+      categoryIds.length > 0
+        ? await db
+            .select()
+            .from(playbookItem)
+            .where(inArray(playbookItem.categoryId, categoryIds))
+            .orderBy(asc(playbookItem.displayOrder))
+        : [];
 
     playbookItems = items
       .filter((item) => item.active)

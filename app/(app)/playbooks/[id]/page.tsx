@@ -14,7 +14,9 @@ export default async function PlaybookPage({ params }: { params: Promise<{ id: s
   const [pb] = await db
     .select()
     .from(playbook)
-    .where(and(eq(playbook.id, id), or(eq(playbook.userId, session.user.id), isNull(playbook.userId))))
+    .where(
+      and(eq(playbook.id, id), or(eq(playbook.userId, session.user.id), isNull(playbook.userId)))
+    )
     .limit(1);
 
   if (!pb) notFound();

@@ -86,12 +86,7 @@ export function SettingsForm({ user }: { user: User }) {
         <form onSubmit={handleProfileSave} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>

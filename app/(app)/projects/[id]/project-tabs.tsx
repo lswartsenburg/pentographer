@@ -24,7 +24,12 @@ const riskBadge = (risk: Finding["riskLevel"]) => {
     low: "bg-[#EAF3DE] text-[#27500A]",
     informational: "bg-muted text-muted-foreground",
   };
-  const labels: Record<string, string> = { high: "High", medium: "Med", low: "Low", informational: "Info" };
+  const labels: Record<string, string> = {
+    high: "High",
+    medium: "Med",
+    low: "Low",
+    informational: "Info",
+  };
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${map[risk]}`}>
       {labels[risk]}
@@ -48,7 +53,12 @@ interface ProjectTabsProps {
   findings: Finding[];
   latestExecSummary: { content: string; createdAt: string } | null;
   execSummaryHistory: Array<{ id: string; authorType: string; createdAt: string }>;
-  exportHistory: Array<{ id: string; action: string; createdAt: string; metadata: Record<string, unknown> | null }>;
+  exportHistory: Array<{
+    id: string;
+    action: string;
+    createdAt: string;
+    metadata: Record<string, unknown> | null;
+  }>;
 }
 
 export function ProjectTabs({
@@ -106,9 +116,16 @@ export function ProjectTabs({
       {/* Findings tab */}
       <TabsContent value="findings" className="flex-1 overflow-y-auto p-4 mt-0">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs text-muted-foreground">{findings.length} finding{findings.length !== 1 ? "s" : ""}</span>
+          <span className="text-xs text-muted-foreground">
+            {findings.length} finding{findings.length !== 1 ? "s" : ""}
+          </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled className="text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#EEEDFE]">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#EEEDFE]"
+            >
               <IconSparkles size={13} />
               AI suggest
             </Button>
@@ -134,8 +151,12 @@ export function ProjectTabs({
                 className="flex items-center gap-3 bg-background border border-border rounded-lg px-3.5 py-2.5 hover:border-border/80 hover:bg-muted/20 transition-colors"
               >
                 {riskBadge(f.riskLevel)}
-                <span className="flex-1 text-sm font-medium text-foreground truncate">{f.title}</span>
-                <span className="text-xs text-muted-foreground shrink-0">{statusLabel(f.status)}</span>
+                <span className="flex-1 text-sm font-medium text-foreground truncate">
+                  {f.title}
+                </span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {statusLabel(f.status)}
+                </span>
                 <IconChevronRight size={14} className="text-muted-foreground shrink-0" />
               </Link>
             ))
@@ -152,7 +173,12 @@ export function ProjectTabs({
               : "Not yet saved"}
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled className="text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#EEEDFE]">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#EEEDFE]"
+            >
               <IconSparkles size={13} />
               AI draft
             </Button>
@@ -171,7 +197,10 @@ export function ProjectTabs({
         ) : (
           <div className="space-y-2">
             {exportHistory.map((e) => (
-              <div key={e.id} className="flex items-center gap-3 bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm">
+              <div
+                key={e.id}
+                className="flex items-center gap-3 bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm"
+              >
                 <span className="text-foreground font-medium capitalize">
                   {(e.metadata as Record<string, string> | null)?.format ?? "Export"}
                 </span>

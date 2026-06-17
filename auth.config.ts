@@ -14,8 +14,7 @@ export const authConfig: NextAuthConfig = {
       }
 
       const isAuthPage =
-        nextUrl.pathname.startsWith("/login") ||
-        nextUrl.pathname.startsWith("/register");
+        nextUrl.pathname.startsWith("/login") || nextUrl.pathname.startsWith("/register");
 
       if (isAuthPage) {
         if (isLoggedIn) {

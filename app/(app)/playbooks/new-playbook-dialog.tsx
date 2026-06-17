@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,13 +61,24 @@ export function NewPlaybookDialog({ children }: { children: React.ReactNode }) {
             <Input id="name" name="name" placeholder="e.g. OWASP Top 10" required />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="description">Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            <Textarea id="description" name="description" placeholder="What this playbook covers…" rows={3} />
+            <Label htmlFor="description">
+              Description <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Textarea
+              id="description"
+              name="description"
+              placeholder="What this playbook covers…"
+              rows={3}
+            />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={loading}>{loading ? "Creating…" : "Create"}</Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Creating…" : "Create"}
+            </Button>
           </div>
         </form>
       </DialogContent>

@@ -14,11 +14,18 @@ const createSchema = z.object({
   displayOrder: z.number().int().optional(),
 });
 
-async function getAccessibleCategory(userId: string, playbookId: string, versionId: string, categoryId: string) {
+async function getAccessibleCategory(
+  userId: string,
+  playbookId: string,
+  versionId: string,
+  categoryId: string
+) {
   const [pb] = await db
     .select()
     .from(playbook)
-    .where(and(eq(playbook.id, playbookId), or(eq(playbook.userId, userId), isNull(playbook.userId))))
+    .where(
+      and(eq(playbook.id, playbookId), or(eq(playbook.userId, userId), isNull(playbook.userId)))
+    )
     .limit(1);
   if (!pb) return null;
 
@@ -32,12 +39,17 @@ async function getAccessibleCategory(userId: string, playbookId: string, version
   const [cat] = await db
     .select()
     .from(playbookCategory)
-    .where(and(eq(playbookCategory.id, categoryId), eq(playbookCategory.playbookVersionId, versionId)))
+    .where(
+      and(eq(playbookCategory.id, categoryId), eq(playbookCategory.playbookVersionId, versionId))
+    )
     .limit(1);
   return cat ?? null;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string; versionId: string; categoryId: string }> }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; versionId: string; categoryId: string }> }
+) {
   const { session, error } = await requireAuth();
   if (error) return error;
   const { id, versionId, categoryId } = await params;
@@ -54,7 +66,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json(items);
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; versionId: string; categoryId: string }> }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; versionId: string; categoryId: string }> }
+) {
   const { session, error } = await requireAuth();
   if (error) return error;
   const { id, versionId, categoryId } = await params;
