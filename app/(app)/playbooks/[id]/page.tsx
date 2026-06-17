@@ -5,11 +5,18 @@ import { playbook, playbookVersion, playbookCategory, playbookItem } from "@/db/
 import { eq, and, or, isNull, desc, asc } from "drizzle-orm";
 import { PlaybookEditor } from "./playbook-editor";
 
-export default async function PlaybookPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PlaybookPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ item?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const { id } = await params;
+  const { item: initialItemId } = await searchParams;
 
   const [pb] = await db
     .select()
@@ -55,6 +62,7 @@ export default async function PlaybookPage({ params }: { params: Promise<{ id: s
       versions={versions}
       categoriesWithItems={categoriesWithItems}
       isOwner={pb.userId === session.user.id}
+      initialItemId={initialItemId}
     />
   );
 }

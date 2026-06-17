@@ -66,6 +66,7 @@ interface PlaybookEditorProps {
   versions: PlaybookVersion[];
   categoriesWithItems: CategoryWithItems[];
   isOwner: boolean;
+  initialItemId?: string;
 }
 
 const riskColors: Record<string, string> = {
@@ -87,14 +88,18 @@ export function PlaybookEditor({
   versions,
   categoriesWithItems,
   isOwner,
+  initialItemId,
 }: PlaybookEditorProps) {
   const router = useRouter();
+
+  const allItems = categoriesWithItems.flatMap((c) => c.items);
+  const resolvedInitial =
+    (initialItemId ? allItems.find((i) => i.id === initialItemId) : null) ?? allItems[0] ?? null;
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(categoriesWithItems.map((c) => [c.id, true]))
   );
-  const [selectedItem, setSelectedItem] = useState<PlaybookItem | null>(
-    categoriesWithItems[0]?.items[0] ?? null
-  );
+  const [selectedItem, setSelectedItem] = useState<PlaybookItem | null>(resolvedInitial);
   const [savingItem, setSavingItem] = useState(false);
   const [itemDraft, setItemDraft] = useState<PlaybookItem | null>(null);
 
@@ -103,6 +108,7 @@ export function PlaybookEditor({
   function selectItem(item: PlaybookItem) {
     setSelectedItem(item);
     setItemDraft({ ...item });
+    router.replace(`/playbooks/${playbook.id}?item=${item.id}`, { scroll: false });
   }
 
   async function saveItem() {
