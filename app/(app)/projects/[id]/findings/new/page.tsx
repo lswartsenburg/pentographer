@@ -39,13 +39,14 @@ export default async function NewFindingPage({ params }: { params: Promise<{ id:
       .orderBy(asc(playbookCategory.displayOrder));
 
     const categoryIds = categories.map((c) => c.id);
-    const items = categoryIds.length > 0
-      ? await db
-          .select()
-          .from(playbookItem)
-          .where(inArray(playbookItem.categoryId, categoryIds))
-          .orderBy(asc(playbookItem.displayOrder))
-      : [];
+    const items =
+      categoryIds.length > 0
+        ? await db
+            .select()
+            .from(playbookItem)
+            .where(inArray(playbookItem.categoryId, categoryIds))
+            .orderBy(asc(playbookItem.displayOrder))
+        : [];
 
     playbookItems = items
       .filter((item) => item.active)
@@ -66,9 +67,13 @@ export default async function NewFindingPage({ params }: { params: Promise<{ id:
     <div className="flex flex-col h-full">
       <header className="flex items-center gap-2 border-b border-border h-12 px-5 bg-background">
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link href="/projects" className="hover:text-foreground">Projects</Link>
+          <Link href="/projects" className="hover:text-foreground">
+            Projects
+          </Link>
           <span>/</span>
-          <Link href={`/projects/${projectId}`} className="hover:text-foreground">{proj.name}</Link>
+          <Link href={`/projects/${projectId}`} className="hover:text-foreground">
+            {proj.name}
+          </Link>
           <span>/</span>
           <span className="text-foreground font-medium">New finding</span>
         </nav>

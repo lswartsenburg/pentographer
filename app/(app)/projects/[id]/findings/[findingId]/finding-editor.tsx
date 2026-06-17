@@ -22,7 +22,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { MarkdownEditor } from "@/components/markdown-editor";
-import { IconDeviceFloppy, IconHistory, IconSparkles, IconRotateClockwise, IconLinkOff } from "@tabler/icons-react";
+import {
+  IconDeviceFloppy,
+  IconHistory,
+  IconSparkles,
+  IconRotateClockwise,
+  IconLinkOff,
+} from "@tabler/icons-react";
 import { PlaybookItemCombobox } from "@/components/playbook-item-combobox";
 
 type RiskLevel = "high" | "medium" | "low" | "informational";
@@ -78,7 +84,12 @@ interface FindingEditorProps {
   playbookItems: PlaybookItemOption[];
 }
 
-const BACKWARD_FROM: FindingStatus[] = ["confirmed", "informational", "false_positive", "in_review"];
+const BACKWARD_FROM: FindingStatus[] = [
+  "confirmed",
+  "informational",
+  "false_positive",
+  "in_review",
+];
 const BACKWARD_TO: FindingStatus[] = ["draft", "in_review"];
 
 function needsJustification(from: FindingStatus, to: FindingStatus) {
@@ -100,7 +111,14 @@ const statusLabels: Record<string, string> = {
   false_positive: "False Positive",
 };
 
-export function FindingEditor({ projectId, projectName, finding: f, latestVersion, versions, playbookItems }: FindingEditorProps) {
+export function FindingEditor({
+  projectId,
+  projectName,
+  finding: f,
+  latestVersion,
+  versions,
+  playbookItems,
+}: FindingEditorProps) {
   const router = useRouter();
   const [title, setTitle] = useState(latestVersion?.title ?? f.title);
   const [description, setDescription] = useState(latestVersion?.description ?? "");
@@ -193,9 +211,13 @@ export function FindingEditor({ projectId, projectName, finding: f, latestVersio
     <>
       <header className="flex items-center justify-between border-b border-border h-12 px-5 bg-background">
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link href="/projects" className="hover:text-foreground">Projects</Link>
+          <Link href="/projects" className="hover:text-foreground">
+            Projects
+          </Link>
           <span>/</span>
-          <Link href={`/projects/${projectId}`} className="hover:text-foreground">{projectName}</Link>
+          <Link href={`/projects/${projectId}`} className="hover:text-foreground">
+            {projectName}
+          </Link>
           <span>/</span>
           <span className="text-foreground font-medium truncate max-w-[200px]">{f.title}</span>
         </nav>
@@ -216,14 +238,19 @@ export function FindingEditor({ projectId, projectName, finding: f, latestVersio
                   <p className="text-sm text-muted-foreground">No versions saved yet.</p>
                 )}
                 {versions.map((v, i) => (
-                  <div key={v.id} className="flex items-center gap-3 border border-border rounded-lg px-3 py-2.5">
+                  <div
+                    key={v.id}
+                    className="flex items-center gap-3 border border-border rounded-lg px-3 py-2.5"
+                  >
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-foreground truncate">{v.title}</p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
                         {new Date(v.createdAt).toLocaleString()} · {v.authorType}
                       </p>
                     </div>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[v.riskLevel]}`}>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[v.riskLevel]}`}
+                    >
                       {v.riskLevel.charAt(0).toUpperCase()}
                     </span>
                     {i > 0 && (
@@ -263,7 +290,9 @@ export function FindingEditor({ projectId, projectName, finding: f, latestVersio
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Description</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+              Description
+            </Label>
             <MarkdownEditor
               value={description}
               onChange={setDescription}
@@ -273,7 +302,9 @@ export function FindingEditor({ projectId, projectName, finding: f, latestVersio
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Remediation</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+              Remediation
+            </Label>
             <MarkdownEditor
               value={remediation}
               onChange={setRemediation}
@@ -283,7 +314,9 @@ export function FindingEditor({ projectId, projectName, finding: f, latestVersio
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Evidence</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+              Evidence
+            </Label>
             <div className="border border-dashed border-border rounded-lg px-4 py-6 text-center text-sm text-muted-foreground">
               Evidence upload coming in Phase 2.
             </div>
@@ -292,11 +325,12 @@ export function FindingEditor({ projectId, projectName, finding: f, latestVersio
 
         {/* Right sidebar */}
         <div className="w-72 shrink-0 border-l border-border bg-background overflow-y-auto p-5 space-y-5">
-
           {/* Playbook item link */}
           {playbookItems.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">Playbook item</p>
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide font-medium">
+                Playbook item
+              </p>
               <PlaybookItemCombobox
                 items={playbookItems}
                 value={currentItemId}
@@ -307,7 +341,9 @@ export function FindingEditor({ projectId, projectName, finding: f, latestVersio
               {currentItem && (
                 <div className="rounded-md border border-border bg-muted/30 px-2.5 py-1.5">
                   <p className="text-[10px] text-muted-foreground">{currentItem.categoryName}</p>
-                  <p className="text-xs font-medium text-foreground leading-snug mt-0.5">{currentItem.name}</p>
+                  <p className="text-xs font-medium text-foreground leading-snug mt-0.5">
+                    {currentItem.name}
+                  </p>
                 </div>
               )}
             </div>
@@ -385,8 +421,15 @@ export function FindingEditor({ projectId, projectName, finding: f, latestVersio
           )}
 
           <div className="pt-2 border-t border-border">
-            <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wide font-medium">AI tools</p>
-            <Button variant="outline" size="sm" disabled className="w-full justify-start text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] text-xs">
+            <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wide font-medium">
+              AI tools
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="w-full justify-start text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] text-xs"
+            >
               <IconSparkles size={12} />
               AI-assisted writing
             </Button>
@@ -394,14 +437,23 @@ export function FindingEditor({ projectId, projectName, finding: f, latestVersio
           </div>
 
           <div className="pt-2 border-t border-border">
-            <p className="text-[11px] text-muted-foreground mb-1 uppercase tracking-wide font-medium">Recent versions</p>
+            <p className="text-[11px] text-muted-foreground mb-1 uppercase tracking-wide font-medium">
+              Recent versions
+            </p>
             {versions.slice(0, 5).map((v) => (
               <div key={v.id} className="flex items-center gap-1.5 py-1">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[v.riskLevel]}`}>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[v.riskLevel]}`}
+                >
                   {v.riskLevel.charAt(0).toUpperCase()}
                 </span>
                 <span className="text-[11px] text-muted-foreground truncate flex-1">
-                  {new Date(v.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {new Date(v.createdAt).toLocaleString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               </div>
             ))}

@@ -26,17 +26,29 @@ export default function NewProjectPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/customers").then((r) => r.json()).then(setCustomers);
-    fetch("/api/playbooks").then((r) => r.json()).then((pbs: Array<{ id: string; name: string; latestVersion: { id: string; version: string } | null }>) => {
-      const opts: PlaybookVersionOption[] = pbs
-        .filter((pb) => pb.latestVersion)
-        .map((pb) => ({
-          id: pb.latestVersion!.id,
-          playbookName: pb.name,
-          version: pb.latestVersion!.version,
-        }));
-      setPlaybookVersions(opts);
-    });
+    fetch("/api/customers")
+      .then((r) => r.json())
+      .then(setCustomers);
+    fetch("/api/playbooks")
+      .then((r) => r.json())
+      .then(
+        (
+          pbs: Array<{
+            id: string;
+            name: string;
+            latestVersion: { id: string; version: string } | null;
+          }>
+        ) => {
+          const opts: PlaybookVersionOption[] = pbs
+            .filter((pb) => pb.latestVersion)
+            .map((pb) => ({
+              id: pb.latestVersion!.id,
+              playbookName: pb.name,
+              version: pb.latestVersion!.version,
+            }));
+          setPlaybookVersions(opts);
+        }
+      );
   }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -53,7 +65,9 @@ export default function NewProjectPage() {
         customerId: form.get("customerId"),
         playbookVersionId: form.get("playbookVersionId") || null,
         scope: form.get("scope") || null,
-        startDate: form.get("startDate") ? new Date(form.get("startDate") as string).toISOString() : null,
+        startDate: form.get("startDate")
+          ? new Date(form.get("startDate") as string).toISOString()
+          : null,
         endDate: form.get("endDate") ? new Date(form.get("endDate") as string).toISOString() : null,
       }),
     });
@@ -74,7 +88,9 @@ export default function NewProjectPage() {
     <div className="flex flex-col h-full">
       <header className="flex items-center gap-2 border-b border-border h-12 px-5 bg-background">
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link href="/projects" className="hover:text-foreground">Projects</Link>
+          <Link href="/projects" className="hover:text-foreground">
+            Projects
+          </Link>
           <span>/</span>
           <span className="text-foreground font-medium">New project</span>
         </nav>
@@ -98,13 +114,17 @@ export default function NewProjectPage() {
               >
                 <option value="">Select a customer…</option>
                 {customers.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
               {customers.length === 0 && (
                 <p className="text-xs text-muted-foreground">
                   No customers yet.{" "}
-                  <Link href="/customers" className="text-primary hover:underline">Add one first</Link>
+                  <Link href="/customers" className="text-primary hover:underline">
+                    Add one first
+                  </Link>
                 </p>
               )}
             </div>
@@ -128,7 +148,9 @@ export default function NewProjectPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="scope">Scope <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Label htmlFor="scope">
+                Scope <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
               <Textarea
                 id="scope"
                 name="scope"
@@ -152,7 +174,9 @@ export default function NewProjectPage() {
 
             <div className="flex justify-end gap-2 pt-1">
               <Link href="/projects">
-                <Button type="button" variant="outline">Cancel</Button>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
               </Link>
               <Button type="submit" disabled={loading}>
                 {loading ? "Creating…" : "Create project"}

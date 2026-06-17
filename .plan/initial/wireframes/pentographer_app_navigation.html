@@ -1,18 +1,80 @@
-
 <style>
-body { margin: 0; }
-.nav-map { padding: 1rem 0; font-family: var(--font-sans); }
-.section-label { font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); letter-spacing: .06em; text-transform: uppercase; margin: 0 0 8px; }
-.row { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
-.page { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 10px 14px; min-width: 130px; flex: 1; cursor: pointer; transition: border-color .15s; }
-.page:hover { border-color: var(--color-border-primary); }
-.page-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin: 0 0 2px; }
-.page-desc { font-size: 11px; color: var(--color-text-secondary); margin: 0; line-height: 1.4; }
-.page.accent { border-color: #378ADD; }
-.page.accent .page-name { color: #185FA5; }
-.connector { display: flex; align-items: center; padding-top: 28px; color: var(--color-text-tertiary); font-size: 18px; flex: 0 0 auto; }
-.group { background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 14px; margin-bottom: 14px; border: 0.5px solid var(--color-border-tertiary); }
-.group-title { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); margin: 0 0 10px; display: flex; align-items: center; gap: 6px; }
+  body {
+    margin: 0;
+  }
+  .nav-map {
+    padding: 1rem 0;
+    font-family: var(--font-sans);
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-text-tertiary);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 0 0 8px;
+  }
+  .row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+  .page {
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: 10px 14px;
+    min-width: 130px;
+    flex: 1;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .page:hover {
+    border-color: var(--color-border-primary);
+  }
+  .page-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    margin: 0 0 2px;
+  }
+  .page-desc {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin: 0;
+    line-height: 1.4;
+  }
+  .page.accent {
+    border-color: #378add;
+  }
+  .page.accent .page-name {
+    color: #185fa5;
+  }
+  .connector {
+    display: flex;
+    align-items: center;
+    padding-top: 28px;
+    color: var(--color-text-tertiary);
+    font-size: 18px;
+    flex: 0 0 auto;
+  }
+  .group {
+    background: var(--color-background-secondary);
+    border-radius: var(--border-radius-lg);
+    padding: 14px;
+    margin-bottom: 14px;
+    border: 0.5px solid var(--color-border-tertiary);
+  }
+  .group-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
 </style>
 <div class="nav-map">
   <div class="group">
@@ -22,7 +84,10 @@ body { margin: 0; }
         <p class="page-name">Login</p>
         <p class="page-desc">Email + password, OAuth</p>
       </div>
-      <div class="page" onclick="sendPrompt('Show me the register page wireframe for Pentographer')">
+      <div
+        class="page"
+        onclick="sendPrompt('Show me the register page wireframe for Pentographer')"
+      >
         <p class="page-name">Register</p>
         <p class="page-desc">Create account</p>
       </div>
@@ -32,7 +97,10 @@ body { margin: 0; }
   <div class="group">
     <p class="group-title"><i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard</p>
     <div class="row">
-      <div class="page accent" onclick="sendPrompt('Show me the dashboard wireframe for Pentographer')">
+      <div
+        class="page accent"
+        onclick="sendPrompt('Show me the dashboard wireframe for Pentographer')"
+      >
         <p class="page-name">Dashboard</p>
         <p class="page-desc">Recent projects, activity overview</p>
       </div>
@@ -42,15 +110,24 @@ body { margin: 0; }
   <div class="group">
     <p class="group-title"><i class="ti ti-folder" aria-hidden="true"></i> Projects</p>
     <div class="row">
-      <div class="page accent" onclick="sendPrompt('Show me the projects list wireframe for Pentographer')">
+      <div
+        class="page accent"
+        onclick="sendPrompt('Show me the projects list wireframe for Pentographer')"
+      >
         <p class="page-name">Projects list</p>
         <p class="page-desc">All projects, filter by status</p>
       </div>
-      <div class="page accent" onclick="sendPrompt('Show me the project detail wireframe for Pentographer')">
+      <div
+        class="page accent"
+        onclick="sendPrompt('Show me the project detail wireframe for Pentographer')"
+      >
         <p class="page-name">Project detail</p>
         <p class="page-desc">Overview, exec summary, findings</p>
       </div>
-      <div class="page" onclick="sendPrompt('Show me the executive summary editor wireframe for Pentographer')">
+      <div
+        class="page"
+        onclick="sendPrompt('Show me the executive summary editor wireframe for Pentographer')"
+      >
         <p class="page-name">Exec summary editor</p>
         <p class="page-desc">Markdown editor, AI draft, version history</p>
       </div>
@@ -60,11 +137,17 @@ body { margin: 0; }
   <div class="group">
     <p class="group-title"><i class="ti ti-bug" aria-hidden="true"></i> Findings</p>
     <div class="row">
-      <div class="page accent" onclick="sendPrompt('Show me the finding detail wireframe for Pentographer')">
+      <div
+        class="page accent"
+        onclick="sendPrompt('Show me the finding detail wireframe for Pentographer')"
+      >
         <p class="page-name">Finding detail</p>
         <p class="page-desc">Description, evidence, risk, status</p>
       </div>
-      <div class="page" onclick="sendPrompt('Show me the finding version history wireframe for Pentographer')">
+      <div
+        class="page"
+        onclick="sendPrompt('Show me the finding version history wireframe for Pentographer')"
+      >
         <p class="page-name">Version history</p>
         <p class="page-desc">Diff view, restore any version</p>
       </div>
@@ -74,11 +157,17 @@ body { margin: 0; }
   <div class="group">
     <p class="group-title"><i class="ti ti-book" aria-hidden="true"></i> Playbooks</p>
     <div class="row">
-      <div class="page accent" onclick="sendPrompt('Show me the playbooks list wireframe for Pentographer')">
+      <div
+        class="page accent"
+        onclick="sendPrompt('Show me the playbooks list wireframe for Pentographer')"
+      >
         <p class="page-name">Playbooks list</p>
         <p class="page-desc">All playbooks, versions</p>
       </div>
-      <div class="page accent" onclick="sendPrompt('Show me the playbook editor wireframe for Pentographer')">
+      <div
+        class="page accent"
+        onclick="sendPrompt('Show me the playbook editor wireframe for Pentographer')"
+      >
         <p class="page-name">Playbook editor</p>
         <p class="page-desc">Categories, items, version</p>
       </div>
@@ -88,11 +177,17 @@ body { margin: 0; }
   <div class="group">
     <p class="group-title"><i class="ti ti-building" aria-hidden="true"></i> Customers</p>
     <div class="row">
-      <div class="page" onclick="sendPrompt('Show me the customers list wireframe for Pentographer')">
+      <div
+        class="page"
+        onclick="sendPrompt('Show me the customers list wireframe for Pentographer')"
+      >
         <p class="page-name">Customers list</p>
         <p class="page-desc">All customers, project count</p>
       </div>
-      <div class="page" onclick="sendPrompt('Show me the customer detail wireframe for Pentographer')">
+      <div
+        class="page"
+        onclick="sendPrompt('Show me the customer detail wireframe for Pentographer')"
+      >
         <p class="page-name">Customer detail</p>
         <p class="page-desc">Contact info, project history</p>
       </div>
@@ -102,15 +197,23 @@ body { margin: 0; }
   <div class="group">
     <p class="group-title"><i class="ti ti-settings" aria-hidden="true"></i> Settings</p>
     <div class="row">
-      <div class="page" onclick="sendPrompt('Show me the settings page wireframe for Pentographer')">
+      <div
+        class="page"
+        onclick="sendPrompt('Show me the settings page wireframe for Pentographer')"
+      >
         <p class="page-name">Profile & account</p>
         <p class="page-desc">Name, email, password</p>
       </div>
-      <div class="page" onclick="sendPrompt('Show me the API keys settings wireframe for Pentographer')">
+      <div
+        class="page"
+        onclick="sendPrompt('Show me the API keys settings wireframe for Pentographer')"
+      >
         <p class="page-name">API keys</p>
         <p class="page-desc">LLM key, access tokens</p>
       </div>
     </div>
   </div>
-  <p style="font-size: 11px; color: var(--color-text-tertiary); margin: 8px 0 0;">Click any page to generate its wireframe.</p>
+  <p style="font-size: 11px; color: var(--color-text-tertiary); margin: 8px 0 0">
+    Click any page to generate its wireframe.
+  </p>
 </div>

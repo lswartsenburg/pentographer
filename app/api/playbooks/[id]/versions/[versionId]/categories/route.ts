@@ -15,7 +15,9 @@ async function getAccessibleVersion(userId: string, playbookId: string, versionI
   const [pb] = await db
     .select()
     .from(playbook)
-    .where(and(eq(playbook.id, playbookId), or(eq(playbook.userId, userId), isNull(playbook.userId))))
+    .where(
+      and(eq(playbook.id, playbookId), or(eq(playbook.userId, userId), isNull(playbook.userId)))
+    )
     .limit(1);
   if (!pb) return null;
 
@@ -27,7 +29,10 @@ async function getAccessibleVersion(userId: string, playbookId: string, versionI
   return version ?? null;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string; versionId: string }> }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; versionId: string }> }
+) {
   const { session, error } = await requireAuth();
   if (error) return error;
   const { id, versionId } = await params;
@@ -44,7 +49,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json(categories);
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; versionId: string }> }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; versionId: string }> }
+) {
   const { session, error } = await requireAuth();
   if (error) return error;
   const { id, versionId } = await params;

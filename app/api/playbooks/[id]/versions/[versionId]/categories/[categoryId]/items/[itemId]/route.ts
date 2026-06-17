@@ -15,12 +15,18 @@ const updateSchema = z.object({
 });
 
 async function getOwnedItem(
-  userId: string, playbookId: string, versionId: string, categoryId: string, itemId: string
+  userId: string,
+  playbookId: string,
+  versionId: string,
+  categoryId: string,
+  itemId: string
 ) {
   const [pb] = await db
     .select()
     .from(playbook)
-    .where(and(eq(playbook.id, playbookId), or(eq(playbook.userId, userId), isNull(playbook.userId))))
+    .where(
+      and(eq(playbook.id, playbookId), or(eq(playbook.userId, userId), isNull(playbook.userId)))
+    )
     .limit(1);
   if (!pb) return null;
 
@@ -34,7 +40,9 @@ async function getOwnedItem(
   const [cat] = await db
     .select()
     .from(playbookCategory)
-    .where(and(eq(playbookCategory.id, categoryId), eq(playbookCategory.playbookVersionId, versionId)))
+    .where(
+      and(eq(playbookCategory.id, categoryId), eq(playbookCategory.playbookVersionId, versionId))
+    )
     .limit(1);
   if (!cat) return null;
 
@@ -46,7 +54,9 @@ async function getOwnedItem(
   return item ?? null;
 }
 
-type RouteParams = { params: Promise<{ id: string; versionId: string; categoryId: string; itemId: string }> };
+type RouteParams = {
+  params: Promise<{ id: string; versionId: string; categoryId: string; itemId: string }>;
+};
 
 export async function GET(_req: NextRequest, { params }: RouteParams) {
   const { session, error } = await requireAuth();
@@ -88,7 +98,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const updateData: Record<string, unknown> = {};
   if (parsed.data.name !== undefined) updateData.name = parsed.data.name.trim();
   if (parsed.data.description !== undefined) updateData.description = parsed.data.description;
-  if (parsed.data.defaultRemediation !== undefined) updateData.defaultRemediation = parsed.data.defaultRemediation;
+  if (parsed.data.defaultRemediation !== undefined)
+    updateData.defaultRemediation = parsed.data.defaultRemediation;
   if (parsed.data.defaultRisk !== undefined) updateData.defaultRisk = parsed.data.defaultRisk;
   if (parsed.data.active !== undefined) updateData.active = parsed.data.active;
   if (parsed.data.displayOrder !== undefined) updateData.displayOrder = parsed.data.displayOrder;

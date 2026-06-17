@@ -158,7 +158,9 @@ export function PlaybookEditor({
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between border-b border-border h-12 px-5 bg-background">
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link href="/playbooks" className="hover:text-foreground">Playbooks</Link>
+          <Link href="/playbooks" className="hover:text-foreground">
+            Playbooks
+          </Link>
           <span>/</span>
           <span className="text-foreground font-medium">{playbook.name}</span>
         </nav>
@@ -205,7 +207,9 @@ export function PlaybookEditor({
                 ) : (
                   <IconChevronRight size={12} className="text-muted-foreground shrink-0" />
                 )}
-                <span className="flex-1 text-xs font-medium text-foreground truncate">{cat.name}</span>
+                <span className="flex-1 text-xs font-medium text-foreground truncate">
+                  {cat.name}
+                </span>
                 <span className="text-[10px] text-muted-foreground">{cat.items.length}</span>
               </button>
 
@@ -215,9 +219,7 @@ export function PlaybookEditor({
                     <button
                       key={item.id}
                       className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors ${
-                        activeItem?.id === item.id
-                          ? "bg-[#E6F1FB]"
-                          : "hover:bg-muted/30"
+                        activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
                       }`}
                       onClick={() => selectItem(item)}
                     >
@@ -251,7 +253,9 @@ export function PlaybookEditor({
         {/* Right panel — item detail */}
         <div className="flex-1 overflow-y-auto p-5">
           {!activeItem ? (
-            <p className="text-sm text-muted-foreground">Select an item from the list to edit it.</p>
+            <p className="text-sm text-muted-foreground">
+              Select an item from the list to edit it.
+            </p>
           ) : (
             <div className="space-y-5">
               <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
@@ -264,7 +268,9 @@ export function PlaybookEditor({
                   <Select
                     value={activeItem.defaultRisk}
                     onValueChange={(v) =>
-                      setItemDraft((d) => d ? { ...d, defaultRisk: v as PlaybookItem["defaultRisk"] } : null)
+                      setItemDraft((d) =>
+                        d ? { ...d, defaultRisk: v as PlaybookItem["defaultRisk"] } : null
+                      )
                     }
                     disabled={!isOwner}
                   >
@@ -299,7 +305,7 @@ export function PlaybookEditor({
                   className="text-xs font-mono resize-y"
                   value={activeItem.description ?? ""}
                   onChange={(e) =>
-                    setItemDraft((d) => d ? { ...d, description: e.target.value } : null)
+                    setItemDraft((d) => (d ? { ...d, description: e.target.value } : null))
                   }
                   disabled={!isOwner}
                   placeholder="Testing guidance for this issue…"
@@ -315,7 +321,7 @@ export function PlaybookEditor({
                   className="text-xs font-mono resize-y"
                   value={activeItem.defaultRemediation ?? ""}
                   onChange={(e) =>
-                    setItemDraft((d) => d ? { ...d, defaultRemediation: e.target.value } : null)
+                    setItemDraft((d) => (d ? { ...d, defaultRemediation: e.target.value } : null))
                   }
                   disabled={!isOwner}
                   placeholder="How to fix this issue…"
@@ -323,14 +329,14 @@ export function PlaybookEditor({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Settings</Label>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                  Settings
+                </Label>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-foreground">Active in this version</span>
                   <Switch
                     checked={activeItem.active}
-                    onCheckedChange={(v) =>
-                      setItemDraft((d) => d ? { ...d, active: v } : null)
-                    }
+                    onCheckedChange={(v) => setItemDraft((d) => (d ? { ...d, active: v } : null))}
                     disabled={!isOwner}
                   />
                 </div>

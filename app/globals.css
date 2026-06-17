@@ -12,7 +12,7 @@
   --card-foreground: #111827;
   --popover: #ffffff;
   --popover-foreground: #111827;
-  --primary: #185FA5;
+  --primary: #185fa5;
   --primary-foreground: #ffffff;
   --secondary: #f3f4f6;
   --secondary-foreground: #111827;
@@ -26,35 +26,35 @@
   --input: transparent;
   --input-background: #f9fafb;
   --switch-background: #d1d5db;
-  --ring: #185FA5;
+  --ring: #185fa5;
   --radius: 0.5rem;
 
   /* Sidebar */
   --sidebar: #ffffff;
   --sidebar-foreground: #111827;
-  --sidebar-primary: #185FA5;
+  --sidebar-primary: #185fa5;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #E6F1FB;
-  --sidebar-accent-foreground: #0C447C;
+  --sidebar-accent: #e6f1fb;
+  --sidebar-accent-foreground: #0c447c;
   --sidebar-border: rgba(0, 0, 0, 0.08);
-  --sidebar-ring: #185FA5;
+  --sidebar-ring: #185fa5;
 
   /* AI accent */
-  --ai-bg: #EEEDFE;
-  --ai-border: #AFA9EC;
-  --ai-fg: #3C3489;
+  --ai-bg: #eeedfe;
+  --ai-border: #afa9ec;
+  --ai-fg: #3c3489;
 
   /* Risk colors */
-  --risk-high-bg: #FCEBEB;
-  --risk-high-fg: #A32D2D;
-  --risk-med-bg: #FAEEDA;
+  --risk-high-bg: #fcebeb;
+  --risk-high-fg: #a32d2d;
+  --risk-med-bg: #faeeda;
   --risk-med-fg: #633806;
-  --risk-low-bg: #EAF3DE;
-  --risk-low-fg: #27500A;
+  --risk-low-bg: #eaf3de;
+  --risk-low-fg: #27500a;
 
   /* Info / badge */
-  --info-bg: #E6F1FB;
-  --info-fg: #0C447C;
+  --info-bg: #e6f1fb;
+  --info-fg: #0c447c;
 
   /* Font weight */
   --font-weight-medium: 500;
@@ -68,7 +68,7 @@
   --card-foreground: #f1f5f9;
   --popover: #1e293b;
   --popover-foreground: #f1f5f9;
-  --primary: #378ADD;
+  --primary: #378add;
   --primary-foreground: #ffffff;
   --secondary: #1e293b;
   --secondary-foreground: #f1f5f9;
@@ -80,10 +80,10 @@
   --destructive-foreground: #ffffff;
   --border: rgba(255, 255, 255, 0.08);
   --input: rgba(255, 255, 255, 0.05);
-  --ring: #378ADD;
+  --ring: #378add;
   --sidebar: #0f172a;
   --sidebar-foreground: #f1f5f9;
-  --sidebar-primary: #378ADD;
+  --sidebar-primary: #378add;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1e3a5f;
   --sidebar-accent-foreground: #93c5fd;

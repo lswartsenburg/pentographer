@@ -38,9 +38,7 @@ const mainNav = [
   { href: "/customers", label: "Customers", icon: IconBuilding },
 ];
 
-const accountNav = [
-  { href: "/settings", label: "Settings", icon: IconSettings },
-];
+const accountNav = [{ href: "/settings", label: "Settings", icon: IconSettings }];
 
 interface AppSidebarProps {
   user: {
@@ -123,9 +121,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                     <span className="truncate text-xs font-medium text-sidebar-foreground">
                       {user.name ?? "User"}
                     </span>
-                    <span className="truncate text-[11px] text-muted-foreground">
-                      {user.email}
-                    </span>
+                    <span className="truncate text-[11px] text-muted-foreground">{user.email}</span>
                   </div>
                   <IconChevronDown size={14} className="ml-auto text-muted-foreground" />
                 </SidebarMenuButton>

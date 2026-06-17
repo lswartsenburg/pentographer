@@ -59,7 +59,9 @@ function tokensToParas(tokens: Tokens.Generic[]): Paragraph[] {
         } else if (inline.type === "em") {
           runs.push(new TextRun({ text: (inline as Tokens.Em).text, italics: true }));
         } else if (inline.type === "codespan") {
-          runs.push(new TextRun({ text: (inline as Tokens.Codespan).text, font: "Courier New", size: 18 }));
+          runs.push(
+            new TextRun({ text: (inline as Tokens.Codespan).text, font: "Courier New", size: 18 })
+          );
         } else if (inline.type === "text") {
           runs.push(new TextRun({ text: (inline as Tokens.Text).text }));
         }
@@ -194,10 +196,7 @@ export async function generateDocx(data: ExportData): Promise<Buffer> {
           new TextRun({ text: "Risk: ", bold: true }),
           new TextRun({ text: riskLabel(f.riskLevel) }),
           ...(f.cvssScore
-            ? [
-                new TextRun({ text: "   CVSS: ", bold: true }),
-                new TextRun({ text: f.cvssScore }),
-              ]
+            ? [new TextRun({ text: "   CVSS: ", bold: true }), new TextRun({ text: f.cvssScore })]
             : []),
           new TextRun({ text: "   Status: ", bold: true }),
           new TextRun({ text: f.status }),

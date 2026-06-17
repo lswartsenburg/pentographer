@@ -103,7 +103,11 @@ export function PlaybookItemCombobox({
               className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
             {search && (
-              <button type="button" onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="text-muted-foreground hover:text-foreground"
+              >
                 <IconX size={12} />
               </button>
             )}
@@ -120,7 +124,10 @@ export function PlaybookItemCombobox({
                 !value && "font-medium text-foreground"
               )}
             >
-              <IconCheck size={12} className={cn("shrink-0", value ? "opacity-0" : "opacity-100")} />
+              <IconCheck
+                size={12}
+                className={cn("shrink-0", value ? "opacity-0" : "opacity-100")}
+              />
               <span className="truncate">Ad-hoc (not from playbook)</span>
             </button>
 

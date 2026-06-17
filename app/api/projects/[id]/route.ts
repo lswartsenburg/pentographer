@@ -87,14 +87,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (parsed.data.name !== undefined) updateData.name = parsed.data.name.trim();
   if (parsed.data.status !== undefined) updateData.status = parsed.data.status;
   if (parsed.data.scope !== undefined) updateData.scope = parsed.data.scope;
-  if (parsed.data.startDate !== undefined) updateData.startDate = parsed.data.startDate ? new Date(parsed.data.startDate) : null;
-  if (parsed.data.endDate !== undefined) updateData.endDate = parsed.data.endDate ? new Date(parsed.data.endDate) : null;
+  if (parsed.data.startDate !== undefined)
+    updateData.startDate = parsed.data.startDate ? new Date(parsed.data.startDate) : null;
+  if (parsed.data.endDate !== undefined)
+    updateData.endDate = parsed.data.endDate ? new Date(parsed.data.endDate) : null;
 
-  const [updated] = await db
-    .update(project)
-    .set(updateData)
-    .where(eq(project.id, id))
-    .returning();
+  const [updated] = await db.update(project).set(updateData).where(eq(project.id, id)).returning();
 
   return NextResponse.json(updated);
 }

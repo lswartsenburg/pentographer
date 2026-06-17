@@ -31,7 +31,9 @@ export function MarkdownEditor({
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="space-y-1">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Markdown</p>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+          Markdown
+        </p>
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -42,7 +44,9 @@ export function MarkdownEditor({
         />
       </div>
       <div className="space-y-1">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Preview</p>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">
+          Preview
+        </p>
         <div
           className="min-h-[calc(theme(spacing.6)_*_12)] rounded-md border border-border bg-background px-3 py-2.5 text-xs text-foreground leading-relaxed prose prose-sm max-w-none overflow-auto"
           dangerouslySetInnerHTML={{ __html: preview }}

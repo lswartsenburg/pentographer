@@ -4,20 +4,14 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Toaster } from "@/components/ui/sonner";
 
-export default async function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   return (
     <SidebarProvider>
       <AppSidebar user={session.user} />
-      <SidebarInset className="min-h-screen">
-        {children}
-      </SidebarInset>
+      <SidebarInset className="min-h-screen">{children}</SidebarInset>
       <Toaster />
     </SidebarProvider>
   );

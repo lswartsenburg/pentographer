@@ -32,7 +32,9 @@ export default function ExportPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = res.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ?? `report.${format}`;
+    a.download =
+      res.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ??
+      `report.${format}`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -41,9 +43,13 @@ export default function ExportPage() {
     <div className="flex flex-col h-full">
       <header className="flex items-center gap-2 border-b border-border h-12 px-5 bg-background">
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link href="/projects" className="hover:text-foreground">Projects</Link>
+          <Link href="/projects" className="hover:text-foreground">
+            Projects
+          </Link>
           <span>/</span>
-          <Link href={`/projects/${projectId}`} className="hover:text-foreground">Project</Link>
+          <Link href={`/projects/${projectId}`} className="hover:text-foreground">
+            Project
+          </Link>
           <span>/</span>
           <span className="text-foreground font-medium">Export</span>
         </nav>
@@ -53,7 +59,8 @@ export default function ExportPage() {
         <div className="max-w-sm space-y-4">
           <h2 className="text-sm font-medium text-foreground">Download report</h2>
           <p className="text-xs text-muted-foreground">
-            Generates a report including the executive summary, scope, risk summary, and all findings sorted by severity.
+            Generates a report including the executive summary, scope, risk summary, and all
+            findings sorted by severity.
           </p>
 
           <div className="grid grid-cols-2 gap-3">

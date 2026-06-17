@@ -1,4 +1,10 @@
-function PentographerMark({ size = 64, theme = "dark" }: { size?: number; theme?: "dark" | "light" }) {
+function PentographerMark({
+  size = 64,
+  theme = "dark",
+}: {
+  size?: number;
+  theme?: "dark" | "light";
+}) {
   const tile = theme === "dark" ? "#080E1A" : "#FFFFFF";
   const nibTop = theme === "dark" ? "#C8D8EE" : "#1E4A8A";
   const nibBot = theme === "dark" ? "#6A8DB8" : "#0F2D5E";
@@ -44,11 +50,38 @@ function PentographerMark({ size = 64, theme = "dark" }: { size?: number; theme?
       <circle cx="120" cy="169" r="3" fill={accent} opacity="0.85" />
 
       {/* Crosshair tick marks at shoulder level */}
-      <line x1="48" y1="88" x2="68" y2="88" stroke={accent} strokeWidth="2.5" strokeOpacity="0.65" strokeLinecap="round" />
-      <line x1="172" y1="88" x2="192" y2="88" stroke={accent} strokeWidth="2.5" strokeOpacity="0.65" strokeLinecap="round" />
+      <line
+        x1="48"
+        y1="88"
+        x2="68"
+        y2="88"
+        stroke={accent}
+        strokeWidth="2.5"
+        strokeOpacity="0.65"
+        strokeLinecap="round"
+      />
+      <line
+        x1="172"
+        y1="88"
+        x2="192"
+        y2="88"
+        stroke={accent}
+        strokeWidth="2.5"
+        strokeOpacity="0.65"
+        strokeLinecap="round"
+      />
 
       {/* Subtle vertical axis mark above V-notch */}
-      <line x1="120" y1="32" x2="120" y2="46" stroke={accent} strokeWidth="2" strokeOpacity="0.4" strokeLinecap="round" />
+      <line
+        x1="120"
+        y1="32"
+        x2="120"
+        y2="46"
+        stroke={accent}
+        strokeWidth="2"
+        strokeOpacity="0.4"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -98,7 +131,10 @@ function SizeRow({ theme }: { theme: "dark" | "light" }) {
   return (
     <div style={{ display: "flex", gap: 28, alignItems: "flex-end" }}>
       {[256, 128, 64, 32, 16].map((s) => (
-        <div key={s} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+        <div
+          key={s}
+          style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}
+        >
           <PentographerMark size={s} theme={theme} />
           <span
             style={{

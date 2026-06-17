@@ -61,7 +61,9 @@ export default async function PlaybooksPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-foreground truncate">{pb.name}</p>
                   {pb.description && (
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">{pb.description}</p>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {pb.description}
+                    </p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -71,7 +73,9 @@ export default async function PlaybooksPage() {
                     </span>
                   )}
                   {pb.userId === null && (
-                    <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">System</span>
+                    <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                      System
+                    </span>
                   )}
                 </div>
               </Link>
