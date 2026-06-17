@@ -1,3 +1,7 @@
+# Environment Setup
+
+Always run `nvm use` before executing any commands in this project. This ensures the correct Node.js version is active.
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

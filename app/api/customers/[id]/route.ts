@@ -1,0 +1,76 @@
+import { NextRequest, NextResponse } from "next/server";
+import { eq, and } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db/client";
+import { customer } from "@/db/schema";
+import { requireAuth } from "@/lib/auth";
+
+const updateSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  contactEmail: z.string().email().max(255).nullable().optional(),
+});
+
+async function getOwnedCustomer(userId: string, id: string) {
+  const [row] = await db
+    .select()
+    .from(customer)
+    .where(and(eq(customer.id, id), eq(customer.userId, userId)))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { session, error } = await requireAuth();
+  if (error) return error;
+  const { id } = await params;
+
+  const row = await getOwnedCustomer(session!.user.id, id);
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  return NextResponse.json(row);
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { session, error } = await requireAuth();
+  if (error) return error;
+  const { id } = await params;
+
+  const row = await getOwnedCustomer(session!.user.id, id);
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const [updated] = await db
+    .update(customer)
+    .set({
+      ...(parsed.data.name !== undefined && { name: parsed.data.name.trim() }),
+      ...(parsed.data.contactEmail !== undefined && { contactEmail: parsed.data.contactEmail }),
+    })
+    .where(eq(customer.id, id))
+    .returning();
+
+  return NextResponse.json(updated);
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { session, error } = await requireAuth();
+  if (error) return error;
+  const { id } = await params;
+
+  const row = await getOwnedCustomer(session!.user.id, id);
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await db.delete(customer).where(eq(customer.id, id));
+
+  return NextResponse.json({ success: true });
+}

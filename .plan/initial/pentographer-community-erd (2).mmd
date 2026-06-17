@@ -1,0 +1,118 @@
+erDiagram
+  USER_ACCOUNT ||--o{ CUSTOMER : owns
+  USER_ACCOUNT ||--o{ PLAYBOOK : owns
+  USER_ACCOUNT ||--o{ PROJECT : owns
+
+  USER_ACCOUNT {
+    uuid id PK
+    string name
+    string email
+    string password_hash
+    timestamp created_at
+  }
+
+  CUSTOMER {
+    uuid id PK
+    uuid user_id FK
+    string name
+    string contact_email
+    timestamp created_at
+  }
+
+  PLAYBOOK {
+    uuid id PK
+    uuid user_id FK
+    string name
+    string description
+    timestamp created_at
+  }
+
+  PLAYBOOK_VERSION {
+    uuid id PK
+    uuid playbook_id FK
+    string version
+    string changelog
+    boolean is_active
+    timestamp created_at
+  }
+
+  PLAYBOOK ||--o{ PLAYBOOK_VERSION : "versioned as"
+
+  PLAYBOOK_CATEGORY {
+    uuid id PK
+    uuid playbook_version_id FK
+    string name
+    string framework_ref
+    int display_order
+  }
+
+  PLAYBOOK_VERSION ||--o{ PLAYBOOK_CATEGORY : contains
+
+  PLAYBOOK_ITEM {
+    uuid id PK
+    uuid category_id FK
+    string name
+    text description
+    text default_remediation
+    string default_risk
+    boolean active
+    int display_order
+  }
+
+  PLAYBOOK_CATEGORY ||--o{ PLAYBOOK_ITEM : contains
+
+  PROJECT {
+    uuid id PK
+    uuid user_id FK
+    uuid customer_id FK
+    uuid playbook_version_id FK
+    string name
+    string status
+    string scope
+    timestamp start_date
+    timestamp end_date
+  }
+
+  CUSTOMER ||--o{ PROJECT : "assessed in"
+  PLAYBOOK_VERSION ||--o{ PROJECT : "pinned to"
+
+  EXECUTIVE_SUMMARY_VERSION {
+    uuid id PK
+    uuid project_id FK
+    text content
+    string author_type
+    timestamp created_at
+  }
+
+  PROJECT ||--o{ EXECUTIVE_SUMMARY_VERSION : "has versions"
+
+  FINDING {
+    uuid id PK
+    uuid project_id FK
+    uuid playbook_item_id FK
+    string title
+    string risk_level
+    float cvss_score
+    string status
+    boolean is_adhoc
+    timestamp created_at
+  }
+
+  PROJECT ||--o{ FINDING : contains
+  PLAYBOOK_ITEM ||--o{ FINDING : "optionally linked"
+
+  FINDING_VERSION {
+    uuid id PK
+    uuid finding_id FK
+    string title
+    text description
+    text remediation
+    string risk_level
+    float cvss_score
+    string status
+    json evidence_urls
+    string author_type
+    timestamp created_at
+  }
+
+  FINDING ||--o{ FINDING_VERSION : "versioned as"

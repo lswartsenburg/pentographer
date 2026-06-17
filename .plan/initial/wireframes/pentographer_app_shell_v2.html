@@ -1,0 +1,72 @@
+
+<style>
+.shell { display: flex; height: 560px; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; font-family: var(--font-sans); background: var(--color-background-tertiary); }
+.sidebar { width: 200px; flex-shrink: 0; background: var(--color-background-primary); border-right: 0.5px solid var(--color-border-tertiary); display: flex; flex-direction: column; }
+.sidebar-logo { padding: 16px; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 14px; font-weight: 500; color: var(--color-text-primary); display: flex; align-items: center; gap: 8px; }
+.sidebar-logo i { font-size: 18px; color: #378ADD; }
+.nav-section { padding: 12px 8px 4px; font-size: 10px; font-weight: 500; color: var(--color-text-tertiary); letter-spacing: .06em; text-transform: uppercase; }
+.nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: var(--border-radius-md); margin: 1px 6px; font-size: 13px; color: var(--color-text-secondary); cursor: pointer; transition: background .1s; }
+.nav-item:hover { background: var(--color-background-secondary); color: var(--color-text-primary); }
+.nav-item.active { background: var(--color-background-info); color: #0C447C; font-weight: 500; }
+.nav-item i { font-size: 16px; }
+.sidebar-footer { margin-top: auto; border-top: 0.5px solid var(--color-border-tertiary); padding: 10px; }
+.user-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; cursor: pointer; border-radius: var(--border-radius-md); }
+.user-row:hover { background: var(--color-background-secondary); }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--color-background-info); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: #0C447C; flex-shrink: 0; }
+.user-info { flex: 1; min-width: 0; }
+.user-name { font-size: 12px; font-weight: 500; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-email { font-size: 11px; color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { height: 49px; background: var(--color-background-primary); border-bottom: 0.5px solid var(--color-border-tertiary); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; }
+.topbar-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
+.btn { font-size: 12px; padding: 5px 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; }
+.btn-primary { background: #185FA5; border-color: #185FA5; color: #fff; }
+.content { flex: 1; padding: 20px; }
+.placeholder-block { background: var(--color-background-secondary); border-radius: var(--border-radius-md); border: 0.5px dashed var(--color-border-secondary); height: 80px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--color-text-tertiary); }
+.placeholder-block.tall { height: 200px; }
+.placeholder-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.placeholder-row .placeholder-block { flex: 1; height: 64px; margin: 0; }
+</style>
+<div class="shell">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <i class="ti ti-shield-check" aria-hidden="true"></i>
+      Pentographer
+    </div>
+
+    <div class="nav-section">Main</div>
+    <div class="nav-item active"><i class="ti ti-layout-dashboard" aria-hidden="true"></i> Dashboard</div>
+    <div class="nav-item"><i class="ti ti-folder" aria-hidden="true"></i> Projects</div>
+    <div class="nav-item"><i class="ti ti-book" aria-hidden="true"></i> Playbooks</div>
+
+    <div class="nav-section">Account</div>
+    <div class="nav-item"><i class="ti ti-settings" aria-hidden="true"></i> Settings</div>
+
+    <div class="sidebar-footer">
+      <div class="user-row">
+        <div class="avatar">JD</div>
+        <div class="user-info">
+          <div class="user-name">Jane Doe</div>
+          <div class="user-email">jane@example.com</div>
+        </div>
+        <i class="ti ti-chevron-down" style="font-size:14px; color: var(--color-text-tertiary);" aria-hidden="true"></i>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title">Dashboard</span>
+      <div class="btn btn-primary"><i class="ti ti-plus" aria-hidden="true"></i> New project</div>
+    </div>
+    <div class="content">
+      <div class="placeholder-row">
+        <div class="placeholder-block">stat: open projects</div>
+        <div class="placeholder-block">stat: total findings</div>
+        <div class="placeholder-block">stat: high risk</div>
+      </div>
+      <div class="placeholder-block">recent projects table</div>
+      <div class="placeholder-block tall">recent findings activity</div>
+    </div>
+  </div>
+</div>

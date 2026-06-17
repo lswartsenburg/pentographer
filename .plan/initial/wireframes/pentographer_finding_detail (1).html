@@ -1,0 +1,137 @@
+
+<style>
+.screen { font-family: var(--font-sans); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; background: var(--color-background-tertiary); }
+.topbar { background: var(--color-background-primary); border-bottom: 0.5px solid var(--color-border-tertiary); padding: 11px 20px; display: flex; align-items: center; justify-content: space-between; }
+.breadcrumb { font-size: 12px; color: var(--color-text-tertiary); }
+.breadcrumb span { color: var(--color-text-primary); font-weight: 500; }
+.btn { font-size: 12px; padding: 5px 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.btn-primary { background: #185FA5; border-color: #185FA5; color: #fff; }
+.btn-ai { background: #EEEDFE; border-color: #AFA9EC; color: #3C3489; }
+.btn-danger { background: #FCEBEB; border-color: #F09595; color: #A32D2D; }
+.body { display: flex; height: 620px; }
+.main { flex: 1; overflow-y: auto; padding: 16px 20px; min-width: 0; }
+.right-panel { width: 220px; flex-shrink: 0; background: var(--color-background-primary); border-left: 0.5px solid var(--color-border-tertiary); padding: 14px; overflow-y: auto; }
+.field-group { margin-bottom: 14px; }
+.field-label { font-size: 11px; color: var(--color-text-tertiary); margin: 0 0 4px; }
+.select-mock { font-size: 12px; padding: 5px 8px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); color: var(--color-text-primary); background: var(--color-background-primary); display: flex; align-items: center; justify-content: space-between; }
+.badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; }
+.badge-high { background: #FCEBEB; color: #A32D2D; }
+.badge-draft { background: var(--color-background-secondary); color: var(--color-text-secondary); }
+.title-input { font-size: 16px; font-weight: 500; color: var(--color-text-primary); border: none; background: none; width: 100%; outline: none; margin-bottom: 10px; border-bottom: 0.5px solid var(--color-border-tertiary); padding-bottom: 10px; }
+.editor-toolbar { display: flex; gap: 2px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+.tool-btn { font-size: 12px; padding: 4px 7px; border-radius: 4px; border: none; background: none; color: var(--color-text-secondary); cursor: pointer; }
+.tool-btn:hover { background: var(--color-background-secondary); }
+.editor-cols { display: flex; gap: 12px; }
+.editor-pane { flex: 1; min-width: 0; }
+.editor-label { font-size: 10px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.editor-area { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 10px; font-size: 12px; color: var(--color-text-primary); min-height: 130px; font-family: var(--font-mono); line-height: 1.6; }
+.preview-area { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 10px; font-size: 12px; color: var(--color-text-primary); min-height: 130px; line-height: 1.7; }
+.section-label { font-size: 12px; font-weight: 500; color: var(--color-text-primary); margin: 16px 0 8px; padding-top: 14px; border-top: 0.5px solid var(--color-border-tertiary); display: flex; justify-content: space-between; align-items: center; }
+.evidence-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.evidence-thumb { width: 80px; height: 60px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--color-text-tertiary); cursor: pointer; flex-direction: column; gap: 4px; }
+.evidence-thumb i { font-size: 20px; }
+.ai-panel { background: #EEEDFE; border-radius: var(--border-radius-md); padding: 10px; margin-bottom: 12px; border: 0.5px solid #AFA9EC; }
+.ai-panel-title { font-size: 11px; font-weight: 500; color: #3C3489; margin: 0 0 8px; display: flex; align-items: center; gap: 5px; }
+.ai-action { font-size: 11px; padding: 4px 8px; border-radius: var(--border-radius-md); border: 0.5px solid #AFA9EC; background: #fff; color: #3C3489; cursor: pointer; display: flex; align-items: center; gap: 4px; margin-bottom: 4px; width: 100%; }
+.version-row { font-size: 11px; padding: 5px 0; border-bottom: 0.5px solid var(--color-border-tertiary); color: var(--color-text-secondary); display: flex; justify-content: space-between; }
+.version-row .author { font-size: 10px; color: var(--color-text-tertiary); }
+.panel-section { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); margin: 14px 0 8px; text-transform: uppercase; letter-spacing: .05em; }
+</style>
+<div class="screen">
+  <div class="topbar">
+    <div class="breadcrumb">Web App Assessment Q2 2025 / Findings / <span>SQL injection on login endpoint</span></div>
+    <div style="display:flex; gap:6px;">
+      <div class="btn"><i class="ti ti-clock" aria-hidden="true"></i> History</div>
+      <div class="btn btn-primary"><i class="ti ti-device-floppy" aria-hidden="true"></i> Save</div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="main">
+      <input class="title-input" value="SQL injection on login endpoint" readonly>
+
+      <div class="section-label">Description
+        <div class="btn btn-ai" style="font-size:11px; padding:3px 8px;"><i class="ti ti-sparkles" aria-hidden="true"></i> AI draft</div>
+      </div>
+      <div class="editor-toolbar">
+        <div class="tool-btn"><b>B</b></div>
+        <div class="tool-btn"><i>I</i></div>
+        <div class="tool-btn">H1</div>
+        <div class="tool-btn">H2</div>
+        <div class="tool-btn"><i class="ti ti-list" aria-hidden="true"></i></div>
+        <div class="tool-btn"><i class="ti ti-code" aria-hidden="true"></i></div>
+        <div class="tool-btn"><i class="ti ti-link" aria-hidden="true"></i></div>
+      </div>
+      <div class="editor-cols">
+        <div class="editor-pane">
+          <div class="editor-label">Markdown</div>
+          <div class="editor-area">The login endpoint at `/api/auth/login` is vulnerable to SQL injection via the `username` parameter.
+
+**Steps to reproduce:**
+1. Intercept login request
+2. Set username to `' OR 1=1--`
+3. Observe successful auth bypass</div>
+        </div>
+        <div class="editor-pane">
+          <div class="editor-label">Preview</div>
+          <div class="preview-area">The login endpoint at <code>/api/auth/login</code> is vulnerable to SQL injection via the <code>username</code> parameter.<br><br><strong>Steps to reproduce:</strong><br>1. Intercept login request<br>2. Set username to <code>' OR 1=1--</code><br>3. Observe successful auth bypass</div>
+        </div>
+      </div>
+
+      <div class="section-label">Remediation
+        <div class="btn btn-ai" style="font-size:11px; padding:3px 8px;"><i class="ti ti-sparkles" aria-hidden="true"></i> AI draft</div>
+      </div>
+      <div class="editor-cols">
+        <div class="editor-pane">
+          <div class="editor-area" style="min-height:80px; font-family: var(--font-mono);">Use parameterized queries or prepared statements for all database access. Never interpolate user input directly into SQL strings.</div>
+        </div>
+        <div class="editor-pane">
+          <div class="preview-area" style="min-height:80px;">Use parameterized queries or prepared statements for all database access. Never interpolate user input directly into SQL strings.</div>
+        </div>
+      </div>
+
+      <div class="section-label">Evidence
+        <div class="btn" style="font-size:11px; padding:3px 8px;"><i class="ti ti-upload" aria-hidden="true"></i> Upload</div>
+      </div>
+      <div class="evidence-grid">
+        <div class="evidence-thumb"><i class="ti ti-photo" aria-hidden="true"></i><span>screenshot.png</span></div>
+        <div class="evidence-thumb"><i class="ti ti-file-text" aria-hidden="true"></i><span>request.txt</span></div>
+        <div class="evidence-thumb" style="border-style:dashed;"><i class="ti ti-plus" aria-hidden="true"></i><span>Add</span></div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="field-group">
+        <div class="field-label">Risk level</div>
+        <div class="select-mock"><span class="badge badge-high">High</span><i class="ti ti-chevron-down" style="font-size:12px;" aria-hidden="true"></i></div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">CVSS score</div>
+        <div class="select-mock">9.1 <span style="font-size:10px; color:var(--color-text-tertiary); margin-left:4px;">Critical</span><i class="ti ti-chevron-down" style="font-size:12px;" aria-hidden="true"></i></div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Status</div>
+        <div class="select-mock">Confirmed <i class="ti ti-chevron-down" style="font-size:12px;" aria-hidden="true"></i></div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Playbook item</div>
+        <div style="font-size:11px; color: var(--color-text-secondary); background: var(--color-background-secondary); padding:5px 8px; border-radius: var(--border-radius-md);">A03 Injection > SQL Injection</div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Type</div>
+        <div style="font-size:11px; color: var(--color-text-secondary);">Playbook finding</div>
+      </div>
+
+      <div class="ai-panel">
+        <div class="ai-panel-title"><i class="ti ti-sparkles" aria-hidden="true"></i> AI tools</div>
+        <div class="ai-action"><i class="ti ti-pencil" aria-hidden="true"></i> Draft description</div>
+        <div class="ai-action"><i class="ti ti-check" aria-hidden="true"></i> Review finding</div>
+        <div class="ai-action"><i class="ti ti-bulb" aria-hidden="true"></i> Suggest related</div>
+      </div>
+
+      <div class="panel-section">Version history</div>
+      <div class="version-row"><span>v3 — saved now</span><span class="author">You</span></div>
+      <div class="version-row"><span>v2 — 2h ago</span><span class="author">AI review</span></div>
+      <div class="version-row"><span>v1 — yesterday</span><span class="author">You</span></div>
+    </div>
+  </div>
+</div>

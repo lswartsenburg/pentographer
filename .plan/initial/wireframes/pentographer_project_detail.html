@@ -1,0 +1,119 @@
+
+<style>
+.screen { font-family: var(--font-sans); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; background: var(--color-background-tertiary); }
+.topbar { background: var(--color-background-primary); border-bottom: 0.5px solid var(--color-border-tertiary); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+.breadcrumb { font-size: 12px; color: var(--color-text-tertiary); }
+.breadcrumb span { color: var(--color-text-primary); font-weight: 500; }
+.topbar-actions { display: flex; gap: 8px; }
+.btn { font-size: 12px; padding: 5px 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.btn-primary { background: #185FA5; border-color: #185FA5; color: #fff; }
+.btn-ai { background: #EEEDFE; border-color: #AFA9EC; color: #3C3489; }
+.body { display: flex; }
+.left-panel { width: 260px; flex-shrink: 0; background: var(--color-background-primary); border-right: 0.5px solid var(--color-border-tertiary); padding: 16px; }
+.field-label { font-size: 11px; color: var(--color-text-tertiary); margin: 0 0 3px; }
+.field-val { font-size: 13px; color: var(--color-text-primary); margin: 0 0 14px; }
+.badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; }
+.badge-progress { background: #E6F1FB; color: #0C447C; }
+.badge-high { background: #FCEBEB; color: #A32D2D; }
+.badge-med { background: #FAEEDA; color: #633806; }
+.badge-low { background: #EAF3DE; color: #27500A; }
+.section-header { font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 8px; border-top: 0.5px solid var(--color-border-tertiary); padding-top: 14px; }
+.main { flex: 1; padding: 16px 20px; min-width: 0; }
+.tab-row { display: flex; gap: 0; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 16px; }
+.tab { font-size: 13px; padding: 6px 14px; cursor: pointer; color: var(--color-text-secondary); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab.active { color: #185FA5; border-bottom-color: #185FA5; font-weight: 500; }
+.finding-row { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.finding-row:hover { border-color: var(--color-border-secondary); }
+.finding-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.finding-meta { font-size: 11px; color: var(--color-text-tertiary); }
+.add-btn { width: 100%; border: 0.5px dashed var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 10px; font-size: 13px; color: var(--color-text-tertiary); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; }
+.risk-summary { display: flex; gap: 8px; margin-bottom: 16px; }
+.risk-pill { flex: 1; border-radius: var(--border-radius-md); padding: 8px; text-align: center; }
+.risk-pill .num { font-size: 20px; font-weight: 500; }
+.risk-pill .lbl { font-size: 11px; }
+</style>
+<div class="screen">
+  <div class="topbar">
+    <div class="breadcrumb">Projects / Acme Corp / <span>Web App Assessment Q2 2025</span></div>
+    <div class="topbar-actions">
+      <div class="btn"><i class="ti ti-download" aria-hidden="true"></i> Export</div>
+      <div class="btn btn-primary"><i class="ti ti-file-text" aria-hidden="true"></i> Generate report</div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="left-panel">
+      <p class="field-label">Status</p>
+      <p class="field-val"><span class="badge badge-progress">In progress</span></p>
+      <p class="field-label">Customer</p>
+      <p class="field-val">Acme Corp</p>
+      <p class="field-label">Playbook</p>
+      <p class="field-val">OWASP Top 10 — v1.2</p>
+      <p class="field-label">Scope</p>
+      <p class="field-val" style="font-size:12px; color: var(--color-text-secondary);">app.acmecorp.com — authenticated + unauthenticated</p>
+      <p class="field-label">Start date</p>
+      <p class="field-val">14 Jun 2025</p>
+      <p class="field-label">End date</p>
+      <p class="field-val">28 Jun 2025</p>
+      <div class="section-header">Risk summary</div>
+      <div class="risk-summary">
+        <div class="risk-pill" style="background:#FCEBEB;">
+          <div class="num" style="color:#A32D2D;">3</div>
+          <div class="lbl" style="color:#A32D2D;">High</div>
+        </div>
+        <div class="risk-pill" style="background:#FAEEDA;">
+          <div class="num" style="color:#633806;">5</div>
+          <div class="lbl" style="color:#633806;">Medium</div>
+        </div>
+        <div class="risk-pill" style="background:#EAF3DE;">
+          <div class="num" style="color:#27500A;">4</div>
+          <div class="lbl" style="color:#27500A;">Low</div>
+        </div>
+      </div>
+    </div>
+    <div class="main">
+      <div class="tab-row">
+        <div class="tab active">Findings</div>
+        <div class="tab">Executive summary</div>
+        <div class="tab">Export history</div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span style="font-size:12px; color: var(--color-text-secondary);">12 findings</span>
+        <div style="display:flex; gap:6px;">
+          <div class="btn btn-ai"><i class="ti ti-sparkles" aria-hidden="true"></i> AI suggest</div>
+          <div class="btn btn-primary"><i class="ti ti-plus" aria-hidden="true"></i> Add finding</div>
+        </div>
+      </div>
+      <div class="finding-row">
+        <span class="badge badge-high">High</span>
+        <span class="finding-title">SQL injection on login endpoint</span>
+        <span class="finding-meta">Confirmed</span>
+        <i class="ti ti-chevron-right" style="font-size:14px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+      </div>
+      <div class="finding-row">
+        <span class="badge badge-high">High</span>
+        <span class="finding-title">Stored XSS in comment field</span>
+        <span class="finding-meta">In review</span>
+        <i class="ti ti-chevron-right" style="font-size:14px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+      </div>
+      <div class="finding-row">
+        <span class="badge badge-med">Med</span>
+        <span class="finding-title">CSRF on password change form</span>
+        <span class="finding-meta">Draft</span>
+        <i class="ti ti-chevron-right" style="font-size:14px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+      </div>
+      <div class="finding-row">
+        <span class="badge badge-med">Med</span>
+        <span class="finding-title">Session token not invalidated on logout</span>
+        <span class="finding-meta">Draft</span>
+        <i class="ti ti-chevron-right" style="font-size:14px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+      </div>
+      <div class="finding-row">
+        <span class="badge badge-low">Low</span>
+        <span class="finding-title">Missing HTTPOnly flag on session cookie</span>
+        <span class="finding-meta">Confirmed</span>
+        <i class="ti ti-chevron-right" style="font-size:14px; color:var(--color-text-tertiary);" aria-hidden="true"></i>
+      </div>
+      <button class="add-btn"><i class="ti ti-plus" aria-hidden="true"></i> Add ad-hoc finding</button>
+    </div>
+  </div>
+</div>
