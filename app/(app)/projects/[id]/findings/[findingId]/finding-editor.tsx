@@ -141,13 +141,19 @@ export function FindingEditor({
     severity: string;
     suggestions: string[];
   } | null>(null);
-  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>(
-    latestVersion?.evidenceUrls ?? []
+  // Normalize legacy evidence items that may be plain strings instead of {key,url} objects
+  const normalizedEvidence: EvidenceItem[] = (latestVersion?.evidenceUrls ?? []).map(
+    (e: unknown, i: number) => {
+      if (typeof e === "string") return { key: `fig-${i + 1}`, url: e };
+      const obj = e as Partial<EvidenceItem>;
+      return { key: obj.key ?? `fig-${i + 1}`, url: obj.url ?? "" };
+    }
   );
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>(normalizedEvidence);
   const nextKeyNum = useRef(
     Math.max(
       0,
-      ...(latestVersion?.evidenceUrls ?? []).map((e) => {
+      ...normalizedEvidence.map((e) => {
         const m = e.key.match(/fig-(\d+)/);
         return m ? parseInt(m[1]) : 0;
       })
