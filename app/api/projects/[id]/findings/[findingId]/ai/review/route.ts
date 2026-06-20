@@ -6,6 +6,7 @@ import { project, finding } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 import { aiErrorMessage } from "@/lib/ai/error";
+import type Anthropic from "@anthropic-ai/sdk";
 
 const reviewSchema = z.object({
   title: z.string().max(500),
@@ -13,6 +14,33 @@ const reviewSchema = z.object({
   remediation: z.string().max(50000).optional().default(""),
   riskLevel: z.enum(["high", "medium", "low", "informational"]),
 });
+
+const REVIEW_TOOL: Anthropic.Tool = {
+  name: "review_finding",
+  description: "Review a penetration test finding for quality and completeness.",
+  input_schema: {
+    type: "object" as const,
+    required: ["completeness", "severity", "suggestions"],
+    properties: {
+      completeness: {
+        type: "string",
+        description:
+          "1-2 sentence assessment of whether the description and remediation are complete and sufficiently detailed.",
+      },
+      severity: {
+        type: "string",
+        description: "1-2 sentence assessment of whether the risk level is appropriate.",
+      },
+      suggestions: {
+        type: "array",
+        description: "2-4 specific, actionable suggestions to improve this finding.",
+        items: { type: "string" },
+        minItems: 2,
+        maxItems: 4,
+      },
+    },
+  },
+};
 
 export async function POST(
   request: NextRequest,
@@ -27,7 +55,6 @@ export async function POST(
     return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
   }
 
-  // Verify ownership
   const [proj] = await db
     .select({ id: project.id })
     .from(project)
@@ -56,7 +83,16 @@ export async function POST(
 
   const { title, description, remediation, riskLevel } = parsed.data;
 
-  const prompt = `You are a senior security consultant reviewing a penetration test finding for quality and completeness.
+  try {
+    const message = await client.messages.create({
+      model: AI_MODEL,
+      max_tokens: 1024,
+      tools: [REVIEW_TOOL],
+      tool_choice: { type: "tool", name: "review_finding" },
+      messages: [
+        {
+          role: "user",
+          content: `You are a senior security consultant reviewing a penetration test finding for quality and completeness.
 
 Finding title: ${title}
 Risk level: ${riskLevel}
@@ -65,38 +101,20 @@ Description:
 ${description || "(empty)"}
 
 Remediation:
-${remediation || "(empty)"}
-
-Review this finding and respond with a JSON object with exactly these three keys:
-- "completeness": A 1-2 sentence assessment of whether the description and remediation are complete and sufficiently detailed.
-- "severity": A 1-2 sentence assessment of whether the risk level is appropriate for what is described.
-- "suggestions": An array of 2-4 specific, actionable suggestions to improve this finding. Each suggestion should be a short string.
-
-Respond with ONLY the JSON object. No preamble or explanation.`;
-
-  try {
-    const message = await client.messages.create({
-      model: AI_MODEL,
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+${remediation || "(empty)"}`,
+        },
+      ],
     });
 
-    const raw = message.content[0]?.type === "text" ? message.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    const cleaned = start !== -1 && end > start ? raw.slice(start, end + 1) : raw.trim();
-
-    let review: { completeness: string; severity: string; suggestions: string[] };
-    try {
-      review = JSON.parse(cleaned);
-    } catch {
+    const block = message.content.find((b) => b.type === "tool_use");
+    if (!block || block.type !== "tool_use") {
       return NextResponse.json(
         { error: "AI returned an unexpected response format. Please try again." },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(review);
+    return NextResponse.json(block.input);
   } catch (err) {
     return NextResponse.json({ error: aiErrorMessage(err) }, { status: 500 });
   }

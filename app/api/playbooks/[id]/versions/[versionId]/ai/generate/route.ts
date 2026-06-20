@@ -6,6 +6,7 @@ import { playbook, playbookVersion, playbookCategory, playbookItem } from "@/db/
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 import { aiErrorMessage } from "@/lib/ai/error";
+import type Anthropic from "@anthropic-ai/sdk";
 
 const existingItemSchema = z.object({
   name: z.string(),
@@ -25,12 +26,140 @@ const generateSchema = z.object({
   existingContent: z.array(existingCategorySchema).optional(),
 });
 
-const VALID_RISKS = new Set(["high", "medium", "low", "informational"]);
-function safeRisk(r: unknown) {
-  return typeof r === "string" && VALID_RISKS.has(r)
-    ? (r as "high" | "medium" | "low" | "informational")
-    : "medium";
+const RISK_ENUM = ["high", "medium", "low", "informational"] as const;
+const VALID_RISKS = new Set(RISK_ENUM);
+function safeRisk(r: unknown): "high" | "medium" | "low" | "informational" {
+  if (typeof r === "string" && (RISK_ENUM as readonly string[]).includes(r)) {
+    return r as "high" | "medium" | "low" | "informational";
+  }
+  return "medium";
 }
+
+function toolInput(message: Anthropic.Message) {
+  const block = message.content.find((b) => b.type === "tool_use");
+  if (!block || block.type !== "tool_use") return null;
+  return block.input as Record<string, unknown>;
+}
+
+// ── Tool schemas ─────────────────────────────────────────────────────────────
+
+const PATCH_TOOL: Anthropic.Tool = {
+  name: "apply_patch",
+  description: "Apply targeted changes to the security testing playbook.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      modifyItems: {
+        type: "array",
+        description: "Items whose fields should be updated. Only include changed fields.",
+        items: {
+          type: "object",
+          required: ["categoryName", "itemName"],
+          properties: {
+            categoryName: { type: "string", description: "Exact category name (case-sensitive)" },
+            itemName: { type: "string", description: "Exact item name (case-sensitive)" },
+            description: { type: "string" },
+            defaultRemediation: { type: "string" },
+            defaultRisk: { type: "string", enum: RISK_ENUM },
+          },
+        },
+      },
+      addItems: {
+        type: "array",
+        description: "New items to add to existing categories.",
+        items: {
+          type: "object",
+          required: ["categoryName", "name", "description", "defaultRemediation", "defaultRisk"],
+          properties: {
+            categoryName: { type: "string" },
+            name: { type: "string" },
+            description: { type: "string" },
+            defaultRemediation: { type: "string" },
+            defaultRisk: { type: "string", enum: RISK_ENUM },
+          },
+        },
+      },
+      removeItems: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["categoryName", "itemName"],
+          properties: {
+            categoryName: { type: "string" },
+            itemName: { type: "string" },
+          },
+        },
+      },
+      addCategories: {
+        type: "array",
+        description: "New categories to add.",
+        items: {
+          type: "object",
+          required: ["name", "items"],
+          properties: {
+            name: { type: "string" },
+            frameworkRef: { type: "string", description: "e.g. A07:2021, or omit" },
+            items: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["name", "description", "defaultRemediation", "defaultRisk"],
+                properties: {
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  defaultRemediation: { type: "string" },
+                  defaultRisk: { type: "string", enum: RISK_ENUM },
+                },
+              },
+            },
+          },
+        },
+      },
+      removeCategories: {
+        type: "array",
+        description: "Exact names of categories to remove.",
+        items: { type: "string" },
+      },
+    },
+  },
+};
+
+const GENERATE_TOOL: Anthropic.Tool = {
+  name: "generate_playbook",
+  description: "Generate a complete security testing playbook.",
+  input_schema: {
+    type: "object" as const,
+    required: ["categories"],
+    properties: {
+      categories: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["name", "items"],
+          properties: {
+            name: { type: "string" },
+            frameworkRef: { type: "string", description: "OWASP ref e.g. A07:2021" },
+            items: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["name", "description", "defaultRemediation", "defaultRisk"],
+                properties: {
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  defaultRemediation: { type: "string" },
+                  defaultRisk: { type: "string", enum: RISK_ENUM },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+// ── Route ────────────────────────────────────────────────────────────────────
 
 export async function POST(
   request: NextRequest,
@@ -78,7 +207,7 @@ export async function POST(
   const { instruction, existingContent } = parsed.data;
   const hasExisting = existingContent && existingContent.length > 0;
 
-  // ── UPDATE MODE: patch-based (only return changes) ──────────────────────
+  // ── UPDATE MODE: patch-based ──────────────────────────────────────────────
   if (hasExisting) {
     const existingJson = JSON.stringify(
       existingContent!.map((cat) => ({
@@ -95,7 +224,16 @@ export async function POST(
       2
     );
 
-    const prompt = `You are a senior penetration tester updating a security testing playbook.
+    try {
+      const message = await client.messages.create({
+        model: AI_MODEL,
+        max_tokens: 4096,
+        tools: [PATCH_TOOL],
+        tool_choice: { type: "tool", name: "apply_patch" },
+        messages: [
+          {
+            role: "user",
+            content: `You are a senior penetration tester updating a security testing playbook.
 
 Current playbook content:
 ${existingJson}
@@ -103,60 +241,20 @@ ${existingJson}
 User instruction:
 ${instruction}
 
-Return ONLY the changes — do NOT reproduce the full playbook. Use this JSON format:
-
-{
-  "modifyItems": [
-    {
-      "categoryName": "exact category name",
-      "itemName": "exact item name",
-      "description": "new value or omit if unchanged",
-      "defaultRemediation": "new value or omit if unchanged",
-      "defaultRisk": "high|medium|low|informational or omit if unchanged"
-    }
-  ],
-  "addItems": [
-    {
-      "categoryName": "exact category name",
-      "name": "new item name",
-      "description": "...",
-      "defaultRemediation": "...",
-      "defaultRisk": "high|medium|low|informational"
-    }
-  ],
-  "removeItems": [
-    { "categoryName": "exact category name", "itemName": "exact item name" }
-  ],
-  "addCategories": [
-    {
-      "name": "new category name",
-      "frameworkRef": "A07:2021 or null",
-      "items": [{ "name": "...", "description": "...", "defaultRemediation": "...", "defaultRisk": "high|medium|low|informational" }]
-    }
-  ],
-  "removeCategories": ["exact category name"]
-}
-
-Rules:
-- Only include arrays that are non-empty. Omit empty ones.
-- categoryName and itemName must match the existing content exactly (case-sensitive).
-- For modifyItems, include only the fields that actually change.
-- defaultRisk must be exactly one of: high, medium, low, informational.
-- Respond with ONLY the JSON object. No preamble.`;
-
-    try {
-      const message = await client.messages.create({
-        model: AI_MODEL,
-        max_tokens: 4096,
-        messages: [{ role: "user", content: prompt }],
+Return ONLY the changes needed to fulfil the instruction. Omit any array that would be empty. Category and item names must match the existing content exactly (case-sensitive).`,
+          },
+        ],
       });
 
-      const raw = message.content[0]?.type === "text" ? message.content[0].text : "";
-      const start = raw.indexOf("{");
-      const end = raw.lastIndexOf("}");
-      const cleaned = start !== -1 && end > start ? raw.slice(start, end + 1) : raw.trim();
+      const input = toolInput(message);
+      if (!input) {
+        return NextResponse.json(
+          { error: "AI returned an unexpected response format. Please try again." },
+          { status: 500 }
+        );
+      }
 
-      let patch: {
+      const patch = input as {
         modifyItems?: Array<{
           categoryName: string;
           itemName: string;
@@ -174,7 +272,7 @@ Rules:
         removeItems?: Array<{ categoryName: string; itemName: string }>;
         addCategories?: Array<{
           name: string;
-          frameworkRef?: string | null;
+          frameworkRef?: string;
           items?: Array<{
             name: string;
             description?: string;
@@ -185,16 +283,7 @@ Rules:
         removeCategories?: string[];
       };
 
-      try {
-        patch = JSON.parse(cleaned);
-      } catch {
-        return NextResponse.json(
-          { error: "AI returned an unexpected response format. Please try again." },
-          { status: 500 }
-        );
-      }
-
-      // Load current DB state (need IDs for targeted updates)
+      // Load current DB state
       const dbCategories = await db
         .select()
         .from(playbookCategory)
@@ -225,7 +314,6 @@ Rules:
       let removed = 0;
 
       await db.transaction(async (tx) => {
-        // ── modifyItems ──────────────────────────────────────────────────────
         for (const change of patch.modifyItems ?? []) {
           const cat = dbCatByName.get(change.categoryName);
           if (!cat) continue;
@@ -247,7 +335,6 @@ Rules:
           }
         }
 
-        // ── addItems ─────────────────────────────────────────────────────────
         for (const change of patch.addItems ?? []) {
           const cat = dbCatByName.get(change.categoryName);
           if (!cat) continue;
@@ -266,7 +353,6 @@ Rules:
           added++;
         }
 
-        // ── removeItems ───────────────────────────────────────────────────────
         for (const change of patch.removeItems ?? []) {
           const cat = dbCatByName.get(change.categoryName);
           if (!cat) continue;
@@ -277,7 +363,6 @@ Rules:
           removed++;
         }
 
-        // ── addCategories ────────────────────────────────────────────────────
         for (const newCat of patch.addCategories ?? []) {
           const nextOrder =
             dbCategories.length > 0 ? Math.max(...dbCategories.map((c) => c.displayOrder)) + 1 : 0;
@@ -307,7 +392,6 @@ Rules:
           }
         }
 
-        // ── removeCategories ─────────────────────────────────────────────────
         for (const catName of patch.removeCategories ?? []) {
           const cat = dbCatByName.get(catName);
           if (!cat) continue;
@@ -323,53 +407,37 @@ Rules:
     }
   }
 
-  // ── GENERATE MODE: full generation from scratch ──────────────────────────
-  const prompt = `You are a senior penetration tester creating a security testing playbook.
-
-${instruction}
-
-Generate a comprehensive security testing playbook for this application. Respond with a JSON object:
-
-{
-  "categories": [
-    {
-      "name": "Category name (e.g. Authentication)",
-      "frameworkRef": "OWASP ref like A07:2021, or null",
-      "items": [
-        {
-          "name": "Short issue name (e.g. Brute Force)",
-          "description": "What to look for and how to test. 2-4 sentences.",
-          "defaultRemediation": "How to fix this. 2-4 sentences.",
-          "defaultRisk": "high | medium | low | informational"
-        }
-      ]
-    }
-  ]
-}
-
-Requirements:
-- Generate 4-8 categories relevant to the application
-- Each category should have 3-6 items
-- Map to OWASP Top 10 2021 where applicable (use A01:2021 format for frameworkRef)
-- defaultRisk must be exactly one of: high, medium, low, informational
-- Respond with ONLY the JSON object. No preamble.`;
-
+  // ── GENERATE MODE: full generation from scratch ───────────────────────────
   try {
     const message = await client.messages.create({
       model: AI_MODEL,
       max_tokens: 8192,
-      messages: [{ role: "user", content: prompt }],
+      tools: [GENERATE_TOOL],
+      tool_choice: { type: "tool", name: "generate_playbook" },
+      messages: [
+        {
+          role: "user",
+          content: `You are a senior penetration tester creating a security testing playbook.
+
+${instruction}
+
+Generate a comprehensive security testing playbook. Include 4-8 categories relevant to the application, each with 3-6 items. Map to OWASP Top 10 2021 where applicable (use A01:2021 format for frameworkRef). Write clear, actionable descriptions and remediations (2-4 sentences each).`,
+        },
+      ],
     });
 
-    const raw = message.content[0]?.type === "text" ? message.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    const cleaned = start !== -1 && end > start ? raw.slice(start, end + 1) : raw.trim();
+    const input = toolInput(message);
+    if (!input) {
+      return NextResponse.json(
+        { error: "AI returned an unexpected response format. Please try again." },
+        { status: 500 }
+      );
+    }
 
-    let generated: {
+    const generated = input as {
       categories: Array<{
         name: string;
-        frameworkRef?: string | null;
+        frameworkRef?: string;
         items: Array<{
           name: string;
           description: string;
@@ -378,15 +446,6 @@ Requirements:
         }>;
       }>;
     };
-
-    try {
-      generated = JSON.parse(cleaned);
-    } catch {
-      return NextResponse.json(
-        { error: "AI returned an unexpected response format. Please try again." },
-        { status: 500 }
-      );
-    }
 
     await db.delete(playbookCategory).where(eq(playbookCategory.playbookVersionId, versionId));
 
