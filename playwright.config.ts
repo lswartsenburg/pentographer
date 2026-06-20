@@ -28,10 +28,12 @@ export default defineConfig({
   ...(process.env.CI
     ? {
         webServer: {
-          command: "pnpm start",
+          // `next start` doesn't work with output:standalone — use the compiled server directly
+          command: "node .next/standalone/server.js",
           url: "http://localhost:3000",
           reuseExistingServer: false,
           timeout: 60_000,
+          env: { PORT: "3000", HOSTNAME: "0.0.0.0" },
         },
       }
     : {}),

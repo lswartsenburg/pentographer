@@ -28,6 +28,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pentographer_test
       NEXTAUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: "true"
       # CI test credentials — matched by the seed step below
       TEST_EMAIL: ci@pentographer.local
       TEST_PASSWORD: CiPassword123!
