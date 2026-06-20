@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -65,11 +65,93 @@ type Playbook = {
   userId: string | null;
 };
 
+type ChangeStatus = "added" | "modified" | "removed" | "unchanged";
+
+interface DiffResult {
+  categoryStatus: Record<string, ChangeStatus>;
+  itemStatus: Record<string, ChangeStatus>;
+  // Published item matched to a draft item (for showing old values), keyed by draft item ID
+  publishedItems: Record<string, PlaybookItem>;
+  // Items/categories in published that were removed in the draft
+  removedCategories: CategoryWithItems[];
+  removedItemsByCategoryId: Record<string, PlaybookItem[]>;
+  totalChanges: number;
+}
+
+function computeDiff(draft: CategoryWithItems[], published: CategoryWithItems[]): DiffResult {
+  const categoryStatus: Record<string, ChangeStatus> = {};
+  const itemStatus: Record<string, ChangeStatus> = {};
+  const publishedItems: Record<string, PlaybookItem> = {};
+  const removedItemsByCategoryId: Record<string, PlaybookItem[]> = {};
+
+  const pubCatByName = new Map(published.map((c) => [c.name.toLowerCase(), c]));
+
+  for (const draftCat of draft) {
+    const pubCat = pubCatByName.get(draftCat.name.toLowerCase());
+    if (!pubCat) {
+      categoryStatus[draftCat.id] = "added";
+      draftCat.items.forEach((i) => (itemStatus[i.id] = "added"));
+      continue;
+    }
+
+    const pubItemByName = new Map(pubCat.items.map((i) => [i.name.toLowerCase(), i]));
+    let catChanged = false;
+
+    for (const draftItem of draftCat.items) {
+      const pubItem = pubItemByName.get(draftItem.name.toLowerCase());
+      if (!pubItem) {
+        itemStatus[draftItem.id] = "added";
+        catChanged = true;
+      } else if (
+        draftItem.description !== pubItem.description ||
+        draftItem.defaultRemediation !== pubItem.defaultRemediation ||
+        draftItem.defaultRisk !== pubItem.defaultRisk ||
+        draftItem.active !== pubItem.active
+      ) {
+        itemStatus[draftItem.id] = "modified";
+        publishedItems[draftItem.id] = pubItem;
+        catChanged = true;
+      } else {
+        itemStatus[draftItem.id] = "unchanged";
+      }
+    }
+
+    // Items in published that were removed in draft
+    const draftItemNames = new Set(draftCat.items.map((i) => i.name.toLowerCase()));
+    const removed = pubCat.items.filter((i) => !draftItemNames.has(i.name.toLowerCase()));
+    if (removed.length > 0) {
+      removedItemsByCategoryId[draftCat.id] = removed;
+      catChanged = true;
+    }
+
+    categoryStatus[draftCat.id] = catChanged ? "modified" : "unchanged";
+  }
+
+  const draftCatNames = new Set(draft.map((c) => c.name.toLowerCase()));
+  const removedCategories = published.filter((c) => !draftCatNames.has(c.name.toLowerCase()));
+
+  const totalChanges =
+    Object.values(categoryStatus).filter((s) => s !== "unchanged").length +
+    Object.values(itemStatus).filter((s) => s !== "unchanged").length +
+    removedCategories.length +
+    Object.values(removedItemsByCategoryId).reduce((sum, arr) => sum + arr.length, 0);
+
+  return {
+    categoryStatus,
+    itemStatus,
+    publishedItems,
+    removedCategories,
+    removedItemsByCategoryId,
+    totalChanges,
+  };
+}
+
 interface PlaybookEditorProps {
   playbook: Playbook;
   version: PlaybookVersion | null;
   versions: PlaybookVersion[];
   categoriesWithItems: CategoryWithItems[];
+  comparisonCategoriesWithItems?: CategoryWithItems[] | null;
   isOwner: boolean;
   initialItemId?: string;
 }
@@ -92,6 +174,7 @@ export function PlaybookEditor({
   version,
   versions,
   categoriesWithItems,
+  comparisonCategoriesWithItems,
   isOwner,
   initialItemId,
 }: PlaybookEditorProps) {
@@ -141,6 +224,15 @@ export function PlaybookEditor({
   const hasDraft = versions.some((v) => v.status === "draft");
   const draftVersion = versions.find((v) => v.status === "draft") ?? null;
   const latestPublished = versions.find((v) => v.status !== "draft") ?? null;
+
+  const diff = useMemo<DiffResult | null>(
+    () =>
+      comparisonCategoriesWithItems
+        ? computeDiff(localCategories, comparisonCategoriesWithItems)
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [comparisonCategoriesWithItems, localCategories]
+  );
 
   useEffect(() => {
     if (addingItemCategoryId) newItemInputRef.current?.focus();
@@ -431,6 +523,16 @@ export function PlaybookEditor({
               </span>
             ) : null}
 
+            {/* Change count badge */}
+            {diff && diff.totalChanges > 0 && (
+              <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+                {diff.totalChanges} {diff.totalChanges === 1 ? "change" : "changes"}
+              </span>
+            )}
+            {diff && diff.totalChanges === 0 && (
+              <span className="text-[11px] text-muted-foreground">No changes</span>
+            )}
+
             {/* AI generate — only in draft */}
             {canEdit && (
               <Button variant="outline" size="sm" onClick={() => setAiGenerateOpen(true)}>
@@ -502,26 +604,64 @@ export function PlaybookEditor({
                     <span className="flex-1 text-xs font-medium text-foreground truncate">
                       {cat.name}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">{cat.items.length}</span>
+                    <div className="flex items-center gap-1.5">
+                      {diff?.categoryStatus[cat.id] === "added" && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      )}
+                      {diff?.categoryStatus[cat.id] === "modified" && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                      )}
+                      <span className="text-[10px] text-muted-foreground">{cat.items.length}</span>
+                    </div>
                   </button>
 
                   {expanded[cat.id] && (
                     <>
-                      {cat.items.map((item) => (
-                        <button
-                          key={item.id}
-                          className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors cursor-pointer ${
-                            activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
-                          }`}
-                          onClick={() => selectItem(item)}
-                        >
-                          <span
-                            className={`flex-1 text-xs truncate ${
-                              activeItem?.id === item.id
-                                ? "text-[#0C447C] font-medium"
-                                : "text-foreground"
+                      {cat.items.map((item) => {
+                        const itemStatus = diff?.itemStatus[item.id];
+                        return (
+                          <button
+                            key={item.id}
+                            className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors cursor-pointer ${
+                              activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
                             }`}
+                            onClick={() => selectItem(item)}
                           >
+                            {itemStatus === "added" && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            )}
+                            {itemStatus === "modified" && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                            )}
+                            {!itemStatus || itemStatus === "unchanged" ? (
+                              <span className="w-1.5 shrink-0" />
+                            ) : null}
+                            <span
+                              className={`flex-1 text-xs truncate ${
+                                activeItem?.id === item.id
+                                  ? "text-[#0C447C] font-medium"
+                                  : "text-foreground"
+                              }`}
+                            >
+                              {item.name}
+                            </span>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
+                            >
+                              {riskLabels[item.defaultRisk]}
+                            </span>
+                          </button>
+                        );
+                      })}
+
+                      {/* Removed items (in published but not in draft) */}
+                      {diff?.removedItemsByCategoryId[cat.id]?.map((item) => (
+                        <div
+                          key={item.id}
+                          className="w-full flex items-center gap-2 pl-6 pr-3 py-1.5 border-b border-border opacity-50"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                          <span className="flex-1 text-xs truncate text-muted-foreground line-through">
                             {item.name}
                           </span>
                           <span
@@ -529,7 +669,7 @@ export function PlaybookEditor({
                           >
                             {riskLabels[item.defaultRisk]}
                           </span>
-                        </button>
+                        </div>
                       ))}
 
                       {/* Add item */}
@@ -574,6 +714,19 @@ export function PlaybookEditor({
                 </div>
               ))}
             </div>
+
+            {/* Removed categories (in published but not in draft) */}
+            {diff?.removedCategories.map((cat) => (
+              <div key={cat.id} className="border-b border-border opacity-50">
+                <div className="w-full flex items-center gap-2 px-3 py-2.5">
+                  <IconChevronDown size={12} className="text-muted-foreground shrink-0" />
+                  <span className="flex-1 text-xs font-medium text-muted-foreground line-through truncate">
+                    {cat.name}
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                </div>
+              </div>
+            ))}
 
             {/* Add category */}
             {canEdit && (
@@ -746,6 +899,60 @@ export function PlaybookEditor({
                     />
                   </div>
                 </div>
+
+                {/* Changes from published */}
+                {diff?.itemStatus[activeItem.id] === "modified" &&
+                  diff.publishedItems[activeItem.id] &&
+                  (() => {
+                    const pub = diff.publishedItems[activeItem.id];
+                    const changes: { field: string; from: string; to: string }[] = [];
+                    if (activeItem.defaultRisk !== pub.defaultRisk)
+                      changes.push({
+                        field: "Risk",
+                        from: pub.defaultRisk,
+                        to: activeItem.defaultRisk,
+                      });
+                    if (activeItem.active !== pub.active)
+                      changes.push({
+                        field: "Active",
+                        from: pub.active ? "Yes" : "No",
+                        to: activeItem.active ? "Yes" : "No",
+                      });
+                    if (activeItem.description !== pub.description)
+                      changes.push({
+                        field: "Description",
+                        from: pub.description ?? "(empty)",
+                        to: activeItem.description ?? "(empty)",
+                      });
+                    if (activeItem.defaultRemediation !== pub.defaultRemediation)
+                      changes.push({
+                        field: "Remediation",
+                        from: pub.defaultRemediation ?? "(empty)",
+                        to: activeItem.defaultRemediation ?? "(empty)",
+                      });
+                    return changes.length > 0 ? (
+                      <div className="space-y-2 pt-2 border-t border-border">
+                        <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                          Changes from published
+                        </Label>
+                        <div className="space-y-2">
+                          {changes.map(({ field, from, to }) => (
+                            <div key={field} className="text-xs space-y-0.5">
+                              <span className="font-medium text-foreground">{field}</span>
+                              <div className="flex gap-2">
+                                <span className="text-red-600 line-through break-all max-h-20 overflow-auto font-mono bg-red-50 rounded px-1.5 py-0.5 flex-1">
+                                  {from}
+                                </span>
+                                <span className="text-emerald-700 break-all max-h-20 overflow-auto font-mono bg-emerald-50 rounded px-1.5 py-0.5 flex-1">
+                                  {to}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
               </div>
             )}
           </div>

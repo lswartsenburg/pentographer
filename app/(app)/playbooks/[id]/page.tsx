@@ -5,6 +5,25 @@ import { playbook, playbookVersion, playbookCategory, playbookItem } from "@/db/
 import { eq, and, or, isNull, desc, asc } from "drizzle-orm";
 import { PlaybookEditor } from "./playbook-editor";
 
+async function fetchCategoriesWithItems(versionId: string) {
+  const categories = await db
+    .select()
+    .from(playbookCategory)
+    .where(eq(playbookCategory.playbookVersionId, versionId))
+    .orderBy(asc(playbookCategory.displayOrder));
+
+  return Promise.all(
+    categories.map(async (cat) => {
+      const items = await db
+        .select()
+        .from(playbookItem)
+        .where(eq(playbookItem.categoryId, cat.id))
+        .orderBy(asc(playbookItem.displayOrder));
+      return { ...cat, items };
+    })
+  );
+}
+
 export default async function PlaybookPage({
   params,
   searchParams,
@@ -38,31 +57,19 @@ export default async function PlaybookPage({
   const draftVersion = versions.find((v) => v.status === "draft") ?? null;
   const latestPublished = versions.find((v) => v.status !== "draft") ?? null;
 
-  // Default selection: owners land on the draft; everyone else sees latest published
   const defaultVersion = isOwner ? (draftVersion ?? latestPublished) : latestPublished;
-
   const selectedVersion = versionParam
     ? (versions.find((v) => v.id === versionParam) ?? defaultVersion)
     : defaultVersion;
 
-  const categories = selectedVersion
-    ? await db
-        .select()
-        .from(playbookCategory)
-        .where(eq(playbookCategory.playbookVersionId, selectedVersion.id))
-        .orderBy(asc(playbookCategory.displayOrder))
+  const categoriesWithItems = selectedVersion
+    ? await fetchCategoriesWithItems(selectedVersion.id)
     : [];
 
-  const categoriesWithItems = await Promise.all(
-    categories.map(async (cat) => {
-      const items = await db
-        .select()
-        .from(playbookItem)
-        .where(eq(playbookItem.categoryId, cat.id))
-        .orderBy(asc(playbookItem.displayOrder));
-      return { ...cat, items };
-    })
-  );
+  // When viewing the draft, also load the published version for diff display
+  const isDraftSelected = selectedVersion?.status === "draft";
+  const comparisonCategoriesWithItems =
+    isDraftSelected && latestPublished ? await fetchCategoriesWithItems(latestPublished.id) : null;
 
   return (
     <PlaybookEditor
@@ -70,6 +77,7 @@ export default async function PlaybookPage({
       version={selectedVersion}
       versions={versions}
       categoriesWithItems={categoriesWithItems}
+      comparisonCategoriesWithItems={comparisonCategoriesWithItems}
       isOwner={isOwner}
       initialItemId={initialItemId}
     />
