@@ -63,6 +63,12 @@ jobs:
       - name: Build app
         run: pnpm build
 
+      - name: Copy static assets into standalone output
+        # output:standalone omits static files — they must be copied manually
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+
       - name: Run E2E tests
         run: pnpm test:e2e
 
