@@ -224,7 +224,8 @@ export function PlaybookEditor({
   const canEdit = isOwner && isDraft;
   const hasDraft = versions.some((v) => v.status === "draft");
   const draftVersion = versions.find((v) => v.status === "draft") ?? null;
-  const latestPublished = versions.find((v) => v.status !== "draft") ?? null;
+  const publishedVersions = versions.filter((v) => v.status !== "draft");
+  const latestPublished = publishedVersions[0] ?? null;
 
   const diff = useMemo<DiffResult | null>(
     () =>
@@ -757,25 +758,59 @@ export function PlaybookEditor({
                 >
                   Draft
                 </button>
-                <button
-                  onClick={() =>
-                    isDraft &&
-                    router.push(`/playbooks/${playbook.id}?version=${latestPublished.id}`)
-                  }
-                  className={`px-3 h-full border-l border-border transition-colors ${
-                    !isDraft
-                      ? "bg-background text-foreground font-medium cursor-default"
-                      : "text-muted-foreground hover:bg-muted/60 cursor-pointer"
-                  }`}
-                >
-                  v{latestPublished.version}
-                </button>
+                {publishedVersions.length > 1 ? (
+                  <select
+                    value={!isDraft ? (version?.id ?? latestPublished.id) : latestPublished.id}
+                    onChange={(e) =>
+                      router.push(`/playbooks/${playbook.id}?version=${e.target.value}`)
+                    }
+                    className={`px-2 h-full border-l border-border bg-background text-xs font-medium cursor-pointer focus:outline-none transition-colors ${
+                      !isDraft ? "text-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {publishedVersions.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        v{v.version}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <button
+                    onClick={() =>
+                      isDraft &&
+                      router.push(`/playbooks/${playbook.id}?version=${latestPublished.id}`)
+                    }
+                    className={`px-3 h-full border-l border-border transition-colors ${
+                      !isDraft
+                        ? "bg-background text-foreground font-medium cursor-default"
+                        : "text-muted-foreground hover:bg-muted/60 cursor-pointer"
+                    }`}
+                  >
+                    v{latestPublished.version}
+                  </button>
+                )}
               </div>
             ) : draftVersion ? (
               <span className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-md font-medium h-7">
                 <IconPencil size={11} />
                 Draft
               </span>
+            ) : publishedVersions.length > 1 ? (
+              <div className="flex items-center border border-border rounded-md overflow-hidden text-xs h-7">
+                <select
+                  value={version?.id ?? latestPublished!.id}
+                  onChange={(e) =>
+                    router.push(`/playbooks/${playbook.id}?version=${e.target.value}`)
+                  }
+                  className="px-2 h-full bg-background text-foreground text-xs font-medium cursor-pointer focus:outline-none"
+                >
+                  {publishedVersions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      v{v.version}
+                    </option>
+                  ))}
+                </select>
+              </div>
             ) : latestPublished ? (
               <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-muted border border-border px-2.5 py-0.5 rounded-md font-medium h-7">
                 <IconEye size={11} />v{latestPublished.version}
