@@ -27,13 +27,13 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pentographer_test
-      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
       NEXTAUTH_URL: http://localhost:3000
+      # CI test credentials — matched by the seed step below
+      TEST_EMAIL: ci@pentographer.local
+      TEST_PASSWORD: CiPassword123!
+      # Optional: set these secrets in repo settings to enable blob/AI features in tests
       BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
-      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-      TEST_PROJECT_ID: ${{ secrets.TEST_PROJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -47,8 +47,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate auth secret
+        run: echo "NEXTAUTH_SECRET=$(openssl rand -base64 32)" >> $GITHUB_ENV
+
       - name: Run database migrations
         run: pnpm db:migrate
+
+      - name: Seed E2E test fixtures
+        run: pnpm tsx db/seed.e2e.ts >> $GITHUB_ENV
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
