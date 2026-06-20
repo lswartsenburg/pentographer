@@ -14,6 +14,7 @@ import {
   IconLoader2,
   IconEye,
   IconPencil,
+  IconTrash,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -291,6 +292,28 @@ export function PlaybookEditor({
     setSelectedItem(updated);
     setItemDraft({ ...updated });
     toast.success("Item saved.");
+  }
+
+  async function deleteItem() {
+    if (!activeItem || !version) return;
+    const res = await fetch(
+      `/api/playbooks/${playbook.id}/versions/${version.id}/categories/${activeItem.categoryId}/items/${activeItem.id}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) {
+      toast.error("Failed to delete item.");
+      return;
+    }
+    setLocalCategories((prev) =>
+      prev.map((c) =>
+        c.id === activeItem.categoryId
+          ? { ...c, items: c.items.filter((i) => i.id !== activeItem.id) }
+          : c
+      )
+    );
+    setSelectedItem(null);
+    setItemDraft(null);
+    toast.success("Item deleted.");
   }
 
   async function saveOverview() {
@@ -816,9 +839,18 @@ export function PlaybookEditor({
               </p>
             ) : (
               <div className="space-y-5">
-                <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
-                  {activeItem.name}
-                </h2>
+                <div className="flex items-start justify-between gap-2 border-b border-border pb-3">
+                  <h2 className="text-sm font-semibold text-foreground">{activeItem.name}</h2>
+                  {canEdit && (
+                    <button
+                      onClick={deleteItem}
+                      className="shrink-0 text-muted-foreground hover:text-destructive transition-colors cursor-pointer p-0.5 rounded"
+                      title="Delete item"
+                    >
+                      <IconTrash size={14} />
+                    </button>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
