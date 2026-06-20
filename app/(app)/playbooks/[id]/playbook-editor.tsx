@@ -435,36 +435,190 @@ export function PlaybookEditor({
         return;
       }
 
-      // Fetch the updated categories+items and refresh local state without a full remount
-      const catRes = await fetch(
-        `/api/playbooks/${playbook.id}/versions/${targetVersionId}/categories`
-      );
-      if (catRes.ok) {
-        const freshCats: CategoryWithItems[] = await catRes.json();
-        const withItems = await Promise.all(
-          freshCats.map(async (cat) => {
-            const itemsRes = await fetch(
-              `/api/playbooks/${playbook.id}/versions/${targetVersionId}/categories/${cat.id}/items`
+      if (data.patch) {
+        // Update mode: apply the patch directly to local state
+        const p = data.patch as {
+          modifyItems?: Array<{
+            categoryName: string;
+            itemName: string;
+            description?: string;
+            defaultRemediation?: string;
+            defaultRisk?: string;
+          }>;
+          addItems?: Array<{
+            categoryName: string;
+            name: string;
+            description?: string;
+            defaultRemediation?: string;
+            defaultRisk?: string;
+          }>;
+          removeItems?: Array<{ categoryName: string; itemName: string }>;
+          addCategories?: Array<{
+            name: string;
+            frameworkRef?: string | null;
+            items?: Array<{
+              name: string;
+              description?: string;
+              defaultRemediation?: string;
+              defaultRisk?: string;
+            }>;
+          }>;
+          removeCategories?: string[];
+        };
+
+        setLocalCategories((prev) => {
+          let cats = prev.map((cat) => ({ ...cat, items: [...cat.items] }));
+
+          // modifyItems
+          for (const change of p.modifyItems ?? []) {
+            cats = cats.map((cat) => {
+              if (cat.name !== change.categoryName) return cat;
+              return {
+                ...cat,
+                items: cat.items.map((item) => {
+                  if (item.name !== change.itemName) return item;
+                  return {
+                    ...item,
+                    ...(change.description !== undefined
+                      ? { description: change.description }
+                      : {}),
+                    ...(change.defaultRemediation !== undefined
+                      ? { defaultRemediation: change.defaultRemediation }
+                      : {}),
+                    ...(change.defaultRisk !== undefined
+                      ? {
+                          defaultRisk: change.defaultRisk as
+                            | "high"
+                            | "medium"
+                            | "low"
+                            | "informational",
+                        }
+                      : {}),
+                  };
+                }),
+              };
+            });
+          }
+
+          // addItems
+          for (const change of p.addItems ?? []) {
+            cats = cats.map((cat) => {
+              if (cat.name !== change.categoryName) return cat;
+              const newItem: PlaybookItem = {
+                id: `temp-${Date.now()}-${Math.random()}`,
+                name: change.name,
+                description: change.description ?? null,
+                defaultRemediation: change.defaultRemediation ?? null,
+                defaultRisk: (change.defaultRisk as PlaybookItem["defaultRisk"]) ?? "medium",
+                active: true,
+                displayOrder: cat.items.length,
+                categoryId: cat.id,
+              };
+              return { ...cat, items: [...cat.items, newItem] };
+            });
+          }
+
+          // removeItems
+          for (const change of p.removeItems ?? []) {
+            cats = cats.map((cat) => {
+              if (cat.name !== change.categoryName) return cat;
+              return { ...cat, items: cat.items.filter((i) => i.name !== change.itemName) };
+            });
+          }
+
+          // addCategories
+          for (const newCat of p.addCategories ?? []) {
+            const tempId = `temp-${Date.now()}-${Math.random()}`;
+            cats.push({
+              id: tempId,
+              name: newCat.name,
+              frameworkRef: newCat.frameworkRef ?? null,
+              displayOrder: cats.length,
+              playbookVersionId: targetVersionId!,
+              items: (newCat.items ?? []).map((item, idx) => ({
+                id: `temp-${Date.now()}-${idx}-${Math.random()}`,
+                name: item.name,
+                description: item.description ?? null,
+                defaultRemediation: item.defaultRemediation ?? null,
+                defaultRisk: (item.defaultRisk as PlaybookItem["defaultRisk"]) ?? "medium",
+                active: true,
+                displayOrder: idx,
+                categoryId: tempId,
+              })),
+            });
+          }
+
+          // removeCategories
+          for (const catName of p.removeCategories ?? []) {
+            cats = cats.filter((cat) => cat.name !== catName);
+          }
+
+          return cats;
+        });
+
+        // If the currently-selected item was modified, update itemDraft too
+        if (selectedItem && p.modifyItems) {
+          const change = p.modifyItems.find((c) => c.itemName === selectedItem.name);
+          if (change) {
+            setItemDraft((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    ...(change.description !== undefined
+                      ? { description: change.description }
+                      : {}),
+                    ...(change.defaultRemediation !== undefined
+                      ? { defaultRemediation: change.defaultRemediation }
+                      : {}),
+                    ...(change.defaultRisk !== undefined
+                      ? {
+                          defaultRisk: change.defaultRisk as PlaybookItem["defaultRisk"],
+                        }
+                      : {}),
+                  }
+                : prev
             );
-            const items: PlaybookItem[] = itemsRes.ok ? await itemsRes.json() : [];
-            return { ...cat, items };
-          })
-        );
-        setLocalCategories(withItems);
-        setExpanded(Object.fromEntries(withItems.map((c) => [c.id, true])));
-        setSelectedItem(null);
-        setItemDraft(null);
+          }
+        }
+
+        const { modified = 0, added = 0, removed = 0 } = data.counts ?? {};
+        const parts = [
+          modified > 0 ? `${modified} modified` : "",
+          added > 0 ? `${added} added` : "",
+          removed > 0 ? `${removed} removed` : "",
+        ].filter(Boolean);
+        toast.success(parts.length > 0 ? `AI update: ${parts.join(", ")}.` : "No changes made.");
       } else {
-        // Generation succeeded but reload failed — prompt user to refresh
-        toast.error(
-          "Generated successfully, but failed to reload content. Please refresh the page."
+        // Generate-from-scratch mode: re-fetch fresh categories
+        const catRes = await fetch(
+          `/api/playbooks/${playbook.id}/versions/${targetVersionId}/categories`
         );
-        return;
+        if (catRes.ok) {
+          const freshCats: CategoryWithItems[] = await catRes.json();
+          const withItems = await Promise.all(
+            freshCats.map(async (cat) => {
+              const itemsRes = await fetch(
+                `/api/playbooks/${playbook.id}/versions/${targetVersionId}/categories/${cat.id}/items`
+              );
+              const items: PlaybookItem[] = itemsRes.ok ? await itemsRes.json() : [];
+              return { ...cat, items };
+            })
+          );
+          setLocalCategories(withItems);
+          setExpanded(Object.fromEntries(withItems.map((c) => [c.id, true])));
+          setSelectedItem(null);
+          setItemDraft(null);
+        } else {
+          toast.error(
+            "Generated successfully, but failed to reload content. Please refresh the page."
+          );
+          return;
+        }
+        toast.success(
+          `Generated ${data.created.categories} categories and ${data.created.items} items.`
+        );
       }
 
-      toast.success(
-        `Generated ${data.created.categories} categories and ${data.created.items} items.`
-      );
       setAiGenerateOpen(false);
       setAiGenerateDesc("");
 
