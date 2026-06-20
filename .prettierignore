@@ -3,3 +3,6 @@ node_modules
 pnpm-lock.yaml
 db/migrations
 public
+
+test-results
+playwright-report
