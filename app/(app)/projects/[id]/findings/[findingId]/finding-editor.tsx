@@ -154,6 +154,7 @@ export function FindingEditor({
     ) + 1
   );
   const [uploading, setUploading] = useState(false);
+  const [evidenceDragOver, setEvidenceDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentItem = playbookItems.find((i) => i.id === currentItemId) ?? null;
@@ -287,16 +288,10 @@ export function FindingEditor({
     }
   }
 
-  async function handleEvidenceUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!fileInputRef.current) return;
-    fileInputRef.current.value = "";
-    if (!file) return;
-
+  async function uploadEvidenceFile(file: File) {
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-
     try {
       const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/evidence`, {
         method: "POST",
@@ -314,6 +309,19 @@ export function FindingEditor({
     } finally {
       setUploading(false);
     }
+  }
+
+  function handleEvidenceUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (file) uploadEvidenceFile(file);
+  }
+
+  function handleEvidenceDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setEvidenceDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadEvidenceFile(file);
   }
 
   async function handleEvidenceDelete(url: string) {
@@ -463,13 +471,37 @@ export function FindingEditor({
             </div>
             {evidenceItems.length === 0 ? (
               <div
-                className="border border-dashed border-border rounded-lg px-4 py-5 text-center text-xs text-muted-foreground cursor-pointer hover:border-border/60 transition-colors"
+                className={`border border-dashed rounded-lg px-4 py-5 text-center text-xs text-muted-foreground cursor-pointer transition-colors ${evidenceDragOver ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-border/60"}`}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setEvidenceDragOver(true);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setEvidenceDragOver(true);
+                }}
+                onDragLeave={() => setEvidenceDragOver(false)}
+                onDrop={handleEvidenceDrop}
               >
-                No evidence attached. Click to upload an image or PDF (max 10 MB).
+                {evidenceDragOver
+                  ? "Drop to upload"
+                  : "No evidence attached. Click or drop an image or PDF (max 10 MB)."}
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div
+                className={`flex flex-wrap gap-2 rounded-lg border border-dashed p-2 transition-colors ${evidenceDragOver ? "border-primary bg-primary/5" : "border-transparent"}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setEvidenceDragOver(true);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setEvidenceDragOver(true);
+                }}
+                onDragLeave={() => setEvidenceDragOver(false)}
+                onDrop={handleEvidenceDrop}
+              >
                 {evidenceItems.map(({ key, url }) => {
                   const isImage = /\.(jpe?g|png|gif|webp|svg)(\?|$)/i.test(url);
                   const proxyUrl = `/api/projects/${projectId}/findings/${f.id}/evidence/proxy?url=${encodeURIComponent(url)}`;

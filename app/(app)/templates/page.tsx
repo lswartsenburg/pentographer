@@ -321,6 +321,7 @@ export default function TemplatesPage() {
   const [myTemplates, setMyTemplates] = useState<TemplateInfo[]>([]);
   const [loadingMine, setLoadingMine] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [templateDragOver, setTemplateDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [marketplace, setMarketplace] = useState<MarketplaceTemplate[]>([]);
@@ -347,6 +348,13 @@ export default function TemplatesPage() {
       .catch(() => setMarketplace([]))
       .finally(() => setLoadingMarket(false));
   }, []);
+
+  function handleTemplateDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setTemplateDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleUpload(file);
+  }
 
   async function handleUpload(file: File) {
     setUploading(true);
@@ -390,7 +398,23 @@ export default function TemplatesPage() {
 
       <div className="flex-1 overflow-auto p-5 space-y-8 max-w-3xl">
         {/* My library */}
-        <section className="space-y-4">
+        <section
+          className="space-y-4"
+          onDragOver={(e) => {
+            e.preventDefault();
+            setTemplateDragOver(true);
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            setTemplateDragOver(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              setTemplateDragOver(false);
+            }
+          }}
+          onDrop={handleTemplateDrop}
+        >
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-foreground">My templates</h2>
@@ -412,13 +436,13 @@ export default function TemplatesPage() {
               />
               <Button
                 size="sm"
-                variant="outline"
+                variant={templateDragOver ? "default" : "outline"}
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
-                className="cursor-pointer disabled:cursor-default"
+                className="cursor-pointer disabled:cursor-default transition-all"
               >
                 <IconUpload size={13} />
-                {uploading ? "Uploading…" : "Upload template"}
+                {uploading ? "Uploading…" : templateDragOver ? "Drop to upload" : "Upload template"}
               </Button>
             </div>
           </div>
@@ -428,9 +452,14 @@ export default function TemplatesPage() {
           {loadingMine ? (
             <p className="text-xs text-muted-foreground">Loading…</p>
           ) : myTemplates.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No templates yet. Upload one above or copy one from the marketplace below.
-            </p>
+            <div
+              className={`border border-dashed rounded-lg px-4 py-8 text-center text-xs text-muted-foreground cursor-pointer transition-colors ${templateDragOver ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-border/60"}`}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {templateDragOver
+                ? "Drop .docx to upload"
+                : "No templates yet. Click or drop a .docx file to upload, or copy one from the marketplace below."}
+            </div>
           ) : (
             <div className="space-y-2">
               {myTemplates.map((t) => (
