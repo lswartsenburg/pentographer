@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { project } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
+import { aiErrorMessage } from "@/lib/ai/error";
 
 const reviewSchema = z.object({
   content: z.string().max(50000),
@@ -67,11 +68,14 @@ Respond with ONLY the JSON object. No preamble or explanation.`;
     try {
       review = JSON.parse(cleaned);
     } catch {
-      return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
+      return NextResponse.json(
+        { error: "AI returned an unexpected response format. Please try again." },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(review);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 500 });
   }
 }

@@ -454,6 +454,12 @@ export function PlaybookEditor({
         setExpanded(Object.fromEntries(withItems.map((c) => [c.id, true])));
         setSelectedItem(null);
         setItemDraft(null);
+      } else {
+        // Generation succeeded but reload failed — prompt user to refresh
+        toast.error(
+          "Generated successfully, but failed to reload content. Please refresh the page."
+        );
+        return;
       }
 
       toast.success(

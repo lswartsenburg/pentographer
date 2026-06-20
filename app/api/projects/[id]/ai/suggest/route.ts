@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { project, finding, playbookVersion, playbookCategory, playbookItem } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
+import { aiErrorMessage } from "@/lib/ai/error";
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
@@ -118,7 +119,10 @@ Respond with ONLY the JSON array. No preamble.`;
     try {
       suggestions = JSON.parse(cleaned);
     } catch {
-      return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
+      return NextResponse.json(
+        { error: "AI returned an unexpected response format. Please try again." },
+        { status: 500 }
+      );
     }
 
     // Validate that returned itemIds are actually in the uncovered list
@@ -127,6 +131,6 @@ Respond with ONLY the JSON array. No preamble.`;
 
     return NextResponse.json(validated);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 500 });
   }
 }

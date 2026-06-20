@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { project, finding, executiveSummaryVersion, customer } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
+import { aiErrorMessage } from "@/lib/ai/error";
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
@@ -92,7 +93,7 @@ Keep it to 250-400 words. Do not use headers — write as flowing prose paragrap
 
         encode({ done: true, versionId: newVersion.id });
       } catch (err) {
-        encode({ error: String(err) });
+        encode({ error: aiErrorMessage(err) });
       } finally {
         controller.close();
       }

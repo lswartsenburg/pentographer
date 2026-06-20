@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { playbook, playbookVersion, playbookCategory, playbookItem } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
+import { aiErrorMessage } from "@/lib/ai/error";
 
 const existingItemSchema = z.object({
   name: z.string(),
@@ -153,7 +154,7 @@ Requirements:
   try {
     const message = await client.messages.create({
       model: AI_MODEL,
-      max_tokens: 8192,
+      max_tokens: 16384,
       messages: [{ role: "user", content: prompt }],
     });
 
@@ -178,7 +179,10 @@ Requirements:
     try {
       generated = JSON.parse(cleaned);
     } catch {
-      return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
+      return NextResponse.json(
+        { error: "AI returned an unexpected response format. Please try again." },
+        { status: 500 }
+      );
     }
 
     // Replace all categories for this version
@@ -222,6 +226,6 @@ Requirements:
 
     return NextResponse.json({ created: { categories: totalCategories, items: totalItems } });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 500 });
   }
 }

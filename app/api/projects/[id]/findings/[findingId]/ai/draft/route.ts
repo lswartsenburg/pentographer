@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { project, finding, findingVersion, playbookItem, playbookCategory } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
+import { aiErrorMessage } from "@/lib/ai/error";
 
 async function getOwnedFinding(userId: string, projectId: string, findingId: string) {
   const [proj] = await db
@@ -95,7 +96,10 @@ Respond with ONLY the JSON object. No preamble or explanation.`;
     try {
       parsed = JSON.parse(cleaned);
     } catch {
-      return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
+      return NextResponse.json(
+        { error: "AI returned an unexpected response format. Please try again." },
+        { status: 500 }
+      );
     }
 
     const description = parsed.description?.trim() ?? "";
@@ -118,6 +122,6 @@ Respond with ONLY the JSON object. No preamble or explanation.`;
 
     return NextResponse.json({ description, remediation, versionId: newVersion.id });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 500 });
   }
 }
