@@ -4,9 +4,10 @@
  *   - A test customer
  *   - A test project
  *
- * Writes TEST_PROJECT_ID=<uuid> to stdout so the CI workflow can
- * capture it with `>> $GITHUB_ENV`.
+ * When running in CI (GITHUB_ENV is set), writes TEST_PROJECT_ID directly
+ * to the Actions env file so dotenvx stdout noise can't corrupt it.
  */
+import fs from "fs";
 import bcrypt from "bcryptjs";
 import { db } from "./client";
 import { userAccount, customer, project } from "./schema";
@@ -37,7 +38,14 @@ async function seed() {
     .values({ userId: user.id, customerId: cust.id, name: "CI Test Project" })
     .returning();
 
-  console.log(`TEST_PROJECT_ID=${proj.id}`);
+  const line = `TEST_PROJECT_ID=${proj.id}`;
+  if (process.env.GITHUB_ENV) {
+    fs.appendFileSync(process.env.GITHUB_ENV, `${line}\n`);
+    console.log("Wrote TEST_PROJECT_ID to GITHUB_ENV");
+  } else {
+    console.log(line);
+  }
+
   process.exit(0);
 }
 
