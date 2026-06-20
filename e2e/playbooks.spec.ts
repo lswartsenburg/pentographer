@@ -1,10 +1,13 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 
 /**
- * Playbook draft/publish workflow — full E2E coverage.
+ * Playbook end-to-end tests.
+ *
+ * The first describe block (serial) covers the full draft/publish workflow plus
+ * additional editing operations (overview, categories, items, version history).
  *
  * beforeAll sets up a fresh playbook via API (2 categories, 3 items) and
- * publishes the initial version. Tests run serially and share that playbook.
+ * publishes the initial version v1. Tests run serially and share that playbook.
  */
 
 async function setupPlaybook(request: APIRequestContext): Promise<{ playbookId: string }> {
@@ -74,6 +77,16 @@ async function expectPublishedMode(page: Page) {
   await expect(page.getByRole("button", { name: "Save" })).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Publish" })).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Discard draft" })).not.toBeVisible();
+}
+
+/** Create a draft via the UI if not already in draft mode. */
+async function ensureDraftMode(page: Page) {
+  const createDraftBtn = page.getByRole("button", { name: "Create draft" });
+  if (await createDraftBtn.isVisible()) {
+    await createDraftBtn.click();
+    await expect(page.getByText("Draft created.")).toBeVisible({ timeout: 10_000 });
+  }
+  await expectDraftMode(page);
 }
 
 test.describe.serial("Playbook draft workflow", () => {
@@ -285,5 +298,134 @@ test.describe.serial("Playbook draft workflow", () => {
     // No diff indicators on the newly published version
     await expect(page.locator(".bg-amber-400").first()).not.toBeVisible();
     await expect(page.getByText(/\d+ changes?/)).not.toBeVisible();
+  });
+
+  // ── 9. Version history navigation ─────────────────────────────────────────
+
+  test("version history: can navigate to an older published version via dropdown", async ({
+    page,
+  }) => {
+    await page.goto(`/playbooks/${playbookId}`);
+
+    // After test 8 there are 2 published versions — the picker renders as a <select>
+    // (the version picker shows a select when publishedVersions.length > 1)
+    const versionSelect = page.locator("header").locator("select");
+    await expect(versionSelect).toBeVisible({ timeout: 8_000 });
+
+    const optionCount = await versionSelect.locator("option").count();
+    expect(optionCount).toBeGreaterThanOrEqual(2);
+
+    // Select the oldest version (last option = lowest version number)
+    await versionSelect.selectOption({ index: optionCount - 1 });
+    await expect(page).toHaveURL(/\?version=/);
+
+    // In read-only / published state — no edit controls
+    await expect(page.getByRole("button", { name: "Save" })).not.toBeVisible();
+
+    // All original items are present in v1
+    await expect(page.getByText("Item Alpha")).toBeVisible();
+    await expect(page.getByText("Item Beta")).toBeVisible();
+    await expect(page.getByText("Item Gamma")).toBeVisible();
+
+    // In v1, Item Alpha has High risk — sidebar badge shows "H"
+    const alphaRow = page.locator("button", { hasText: "Item Alpha" });
+    await expect(alphaRow.locator("span", { hasText: /^H$/ })).toBeVisible();
+  });
+
+  // ── 10. Playbook overview edit ────────────────────────────────────────────
+
+  test("editing playbook name and description updates the overview", async ({ page }) => {
+    await page.goto(`/playbooks/${playbookId}`);
+    await ensureDraftMode(page);
+
+    // The overview detail panel (shown when no item is selected) has class max-w-xl.
+    // It contains exactly one <input> — the Name field.
+    const overviewPanel = page.locator(".max-w-xl");
+    await expect(overviewPanel).toBeVisible({ timeout: 5_000 });
+
+    const nameInput = overviewPanel.locator("input");
+    await nameInput.fill("Updated Playbook Name");
+
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Playbook saved.")).toBeVisible({ timeout: 8_000 });
+
+    // Input persists the saved name after the toast
+    await expect(nameInput).toHaveValue("Updated Playbook Name");
+
+    // Edit instructions text
+    await page
+      .getByPlaceholder("Describe the scope, methodology, and any reviewer instructions")
+      .fill("E2E test instructions");
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Playbook saved.")).toBeVisible({ timeout: 8_000 });
+  });
+
+  // ── 11. Add category ─────────────────────────────────────────────────────
+
+  test("adding a new category creates it in the sidebar", async ({ page }) => {
+    await page.goto(`/playbooks/${playbookId}`);
+    await ensureDraftMode(page);
+
+    // Scroll to the bottom of the sidebar to find "+ Add category"
+    const addCategoryLink = page.getByText("Add category");
+    await addCategoryLink.scrollIntoViewIfNeeded();
+    await addCategoryLink.click();
+
+    // Type the new category name and confirm
+    await page.keyboard.type("New E2E Category");
+    await page.keyboard.press("Enter");
+
+    // The new category should appear in the sidebar
+    await expect(page.getByText("New E2E Category")).toBeVisible({ timeout: 5_000 });
+  });
+
+  // ── 12. Item description and remediation ──────────────────────────────────
+
+  test("editing item description and remediation and saving reflects in detail panel", async ({
+    page,
+  }) => {
+    await page.goto(`/playbooks/${playbookId}`);
+    await ensureDraftMode(page);
+
+    await page.getByText("Item Gamma").click();
+
+    const descriptionField = page.getByPlaceholder("Testing guidance for this issue…");
+    await descriptionField.fill("E2E description text");
+
+    const remediationField = page.getByPlaceholder("How to fix this issue…");
+    await remediationField.fill("E2E remediation text");
+
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Item saved.")).toBeVisible({ timeout: 8_000 });
+
+    // After save, the detail panel should still show the saved values
+    await expect(descriptionField).toHaveValue("E2E description text");
+    await expect(remediationField).toHaveValue("E2E remediation text");
+  });
+
+  // ── 13. Toggle item active / inactive ────────────────────────────────────
+
+  test("toggling an item inactive is saved and shows the item as inactive", async ({ page }) => {
+    await page.goto(`/playbooks/${playbookId}`);
+    await ensureDraftMode(page);
+
+    await page.getByText("Item Gamma").click();
+
+    // "Active in this version" switch should initially be on
+    const activeSwitch = page.getByRole("switch");
+    await expect(activeSwitch).toBeChecked();
+
+    // Toggle it off
+    await activeSwitch.click();
+    await expect(activeSwitch).not.toBeChecked();
+
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Item saved.")).toBeVisible({ timeout: 8_000 });
+
+    // Toggle back on so subsequent tests are not affected
+    await activeSwitch.click();
+    await expect(activeSwitch).toBeChecked();
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Item saved.")).toBeVisible({ timeout: 8_000 });
   });
 });
