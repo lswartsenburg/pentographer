@@ -385,14 +385,46 @@ export function PlaybookEditor({
   }
 
   async function handleAiGenerate() {
-    if (!version) return;
     setAiGenerating(true);
     try {
-      const res = await fetch(`/api/playbooks/${playbook.id}/versions/${version.id}/ai/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appDescription: aiGenerateDesc }),
-      });
+      // Auto-create a draft if we're currently on the published version
+      let targetVersionId = version?.status === "draft" ? version.id : null;
+      if (!targetVersionId) {
+        const draftRes = await fetch(`/api/playbooks/${playbook.id}/versions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ changelog: "" }),
+        });
+        if (!draftRes.ok) {
+          toast.error("Failed to create draft.");
+          return;
+        }
+        const newDraft = await draftRes.json();
+        targetVersionId = newDraft.id;
+      }
+
+      const existingContent = localCategories.map((cat) => ({
+        name: cat.name,
+        frameworkRef: cat.frameworkRef,
+        items: cat.items.map((i) => ({
+          name: i.name,
+          description: i.description,
+          defaultRemediation: i.defaultRemediation,
+          defaultRisk: i.defaultRisk,
+        })),
+      }));
+
+      const res = await fetch(
+        `/api/playbooks/${playbook.id}/versions/${targetVersionId}/ai/generate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instruction: aiGenerateDesc,
+            existingContent: existingContent.length > 0 ? existingContent : undefined,
+          }),
+        }
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (data.error === "AI_NOT_CONFIGURED") {
@@ -402,12 +434,38 @@ export function PlaybookEditor({
         }
         return;
       }
+
+      // Fetch the updated categories+items and refresh local state without a full remount
+      const catRes = await fetch(
+        `/api/playbooks/${playbook.id}/versions/${targetVersionId}/categories`
+      );
+      if (catRes.ok) {
+        const freshCats: CategoryWithItems[] = await catRes.json();
+        const withItems = await Promise.all(
+          freshCats.map(async (cat) => {
+            const itemsRes = await fetch(
+              `/api/playbooks/${playbook.id}/versions/${targetVersionId}/categories/${cat.id}/items`
+            );
+            const items: PlaybookItem[] = itemsRes.ok ? await itemsRes.json() : [];
+            return { ...cat, items };
+          })
+        );
+        setLocalCategories(withItems);
+        setExpanded(Object.fromEntries(withItems.map((c) => [c.id, true])));
+        setSelectedItem(null);
+        setItemDraft(null);
+      }
+
       toast.success(
         `Generated ${data.created.categories} categories and ${data.created.items} items.`
       );
       setAiGenerateOpen(false);
       setAiGenerateDesc("");
-      router.refresh();
+
+      // If we auto-created a draft, navigate to it
+      if (targetVersionId !== version?.id) {
+        router.push(`/playbooks/${playbook.id}?version=${targetVersionId}`);
+      }
     } catch {
       toast.error("AI generation failed.");
     } finally {
@@ -471,19 +529,23 @@ export function PlaybookEditor({
             <DialogTitle>AI Generate Playbook</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            {localCategories.length > 0 && (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
-                This version already has {localCategories.length} categories. Generating will
-                replace all existing content.
+            {!isDraft && (
+              <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2.5 py-1.5">
+                A draft will be created automatically.
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              Describe the application type and tech stack. The AI will generate categories and
-              checklist items tailored to it.
+              {localCategories.length > 0
+                ? "Describe what to add, change, or improve. Existing content will be used as context."
+                : "Describe the application type and tech stack to generate a playbook from scratch."}
             </p>
             <Textarea
               rows={5}
-              placeholder="e.g. A Node.js REST API with JWT authentication, PostgreSQL database, and a React SPA frontend. Users can manage invoices and upload PDF documents."
+              placeholder={
+                localCategories.length > 0
+                  ? "e.g. Add GDPR compliance checks and expand the authentication section with OAuth2 test cases."
+                  : "e.g. A Node.js REST API with JWT authentication, PostgreSQL database, and a React SPA frontend. Users can manage invoices and upload PDF documents."
+              }
               value={aiGenerateDesc}
               onChange={(e) => setAiGenerateDesc(e.target.value)}
               className="text-xs resize-none"
@@ -495,7 +557,7 @@ export function PlaybookEditor({
               <Button
                 size="sm"
                 onClick={handleAiGenerate}
-                disabled={aiGenerating || aiGenerateDesc.trim().length < 10}
+                disabled={aiGenerating || aiGenerateDesc.trim().length < 5}
                 className="bg-[#3C3489] text-white hover:bg-[#2e286a]"
               >
                 {aiGenerating ? (
@@ -570,8 +632,8 @@ export function PlaybookEditor({
               <span className="text-[11px] text-muted-foreground">No changes</span>
             )}
 
-            {/* AI generate — only in draft */}
-            {canEdit && (
+            {/* AI generate — available to owner; auto-creates draft if needed */}
+            {isOwner && (
               <Button variant="outline" size="sm" onClick={() => setAiGenerateOpen(true)}>
                 <IconSparkles size={14} />
                 AI generate

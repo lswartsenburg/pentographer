@@ -6,8 +6,22 @@ import { playbook, playbookVersion, playbookCategory, playbookItem } from "@/db/
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 
+const existingItemSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  defaultRemediation: z.string().nullable().optional(),
+  defaultRisk: z.enum(["high", "medium", "low", "informational"]),
+});
+
+const existingCategorySchema = z.object({
+  name: z.string(),
+  frameworkRef: z.string().nullable().optional(),
+  items: z.array(existingItemSchema),
+});
+
 const generateSchema = z.object({
-  appDescription: z.string().min(10).max(2000),
+  instruction: z.string().min(1).max(2000),
+  existingContent: z.array(existingCategorySchema).optional(),
 });
 
 export async function POST(
@@ -23,7 +37,6 @@ export async function POST(
     return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
   }
 
-  // Only playbook owner can generate
   const [pb] = await db
     .select()
     .from(playbook)
@@ -38,8 +51,9 @@ export async function POST(
     .limit(1);
   if (!version) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Clear existing categories (cascade deletes items via FK) before generating
-  await db.delete(playbookCategory).where(eq(playbookCategory.playbookVersionId, versionId));
+  if (version.status !== "draft") {
+    return NextResponse.json({ error: "Can only generate into a draft version" }, { status: 400 });
+  }
 
   let body: unknown;
   try {
@@ -53,22 +67,48 @@ export async function POST(
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const prompt = `You are a senior penetration tester creating a security testing playbook.
+  const { instruction, existingContent } = parsed.data;
+  const hasExisting = existingContent && existingContent.length > 0;
 
-Application description:
-${parsed.data.appDescription}
+  const existingJson = hasExisting
+    ? JSON.stringify(
+        existingContent!.map((cat) => ({
+          name: cat.name,
+          frameworkRef: cat.frameworkRef ?? null,
+          items: cat.items.map((i) => ({
+            name: i.name,
+            description: i.description ?? null,
+            defaultRemediation: i.defaultRemediation ?? null,
+            defaultRisk: i.defaultRisk,
+          })),
+        })),
+        null,
+        2
+      )
+    : null;
 
-Generate a comprehensive security testing playbook for this application type. Respond with a JSON object:
+  const prompt = hasExisting
+    ? `You are a senior penetration tester updating a security testing playbook.
+
+Current playbook content:
+${existingJson}
+
+User instruction:
+${instruction}
+
+Update the playbook based on the instruction. You may add new categories or items, modify existing ones, or remove items that are no longer relevant (by omitting them). Reproduce unchanged items verbatim.
+
+Respond with the complete updated playbook as a JSON object:
 
 {
   "categories": [
     {
-      "name": "Category name (e.g. Authentication)",
-      "frameworkRef": "Optional framework reference (e.g. A07:2021) or null",
+      "name": "Category name",
+      "frameworkRef": "OWASP ref like A07:2021, or null",
       "items": [
         {
-          "name": "Short issue name (e.g. Brute Force)",
-          "description": "What to look for and how to test for it. 2-4 sentences.",
+          "name": "Short issue name",
+          "description": "What to look for and how to test. 2-4 sentences.",
           "defaultRemediation": "How to fix this. 2-4 sentences.",
           "defaultRisk": "high | medium | low | informational"
         }
@@ -78,13 +118,37 @@ Generate a comprehensive security testing playbook for this application type. Re
 }
 
 Requirements:
-- Generate 4-8 categories relevant to the application type
+- defaultRisk must be exactly one of: high, medium, low, informational
+- Respond with ONLY the JSON object. No preamble.`
+    : `You are a senior penetration tester creating a security testing playbook.
+
+${instruction}
+
+Generate a comprehensive security testing playbook for this application. Respond with a JSON object:
+
+{
+  "categories": [
+    {
+      "name": "Category name (e.g. Authentication)",
+      "frameworkRef": "OWASP ref like A07:2021, or null",
+      "items": [
+        {
+          "name": "Short issue name (e.g. Brute Force)",
+          "description": "What to look for and how to test. 2-4 sentences.",
+          "defaultRemediation": "How to fix this. 2-4 sentences.",
+          "defaultRisk": "high | medium | low | informational"
+        }
+      ]
+    }
+  ]
+}
+
+Requirements:
+- Generate 4-8 categories relevant to the application
 - Each category should have 3-6 items
-- Be specific to the application description, not just generic web security
 - Map to OWASP Top 10 2021 where applicable (use A01:2021 format for frameworkRef)
 - defaultRisk must be exactly one of: high, medium, low, informational
-
-Respond with ONLY the JSON object. No preamble.`;
+- Respond with ONLY the JSON object. No preamble.`;
 
   try {
     const message = await client.messages.create({
@@ -117,9 +181,12 @@ Respond with ONLY the JSON object. No preamble.`;
       return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
     }
 
-    // Insert all categories and items in a transaction
+    // Replace all categories for this version
+    await db.delete(playbookCategory).where(eq(playbookCategory.playbookVersionId, versionId));
+
     let totalCategories = 0;
     let totalItems = 0;
+    const validRisks = new Set(["high", "medium", "low", "informational"]);
 
     await db.transaction(async (tx) => {
       for (let catIdx = 0; catIdx < generated.categories.length; catIdx++) {
@@ -136,7 +203,6 @@ Respond with ONLY the JSON object. No preamble.`;
 
         totalCategories++;
 
-        const validRisks = new Set(["high", "medium", "low", "informational"]);
         for (let itemIdx = 0; itemIdx < (cat.items ?? []).length; itemIdx++) {
           const item = cat.items[itemIdx];
           const defaultRisk = validRisks.has(item.defaultRisk) ? item.defaultRisk : "medium";
