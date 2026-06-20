@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
+import type { EvidenceItem } from "@/db/schema";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
@@ -27,7 +28,10 @@ import {
   IconHistory,
   IconSparkles,
   IconRotateClockwise,
-  IconLinkOff,
+  IconLoader2,
+  IconUpload,
+  IconX,
+  IconFile,
 } from "@tabler/icons-react";
 import { PlaybookItemCombobox } from "@/components/playbook-item-combobox";
 
@@ -52,7 +56,7 @@ interface FindingVersion {
   riskLevel: RiskLevel;
   cvssScore: string | null;
   status: FindingStatus;
-  evidenceUrls: string[];
+  evidenceUrls: EvidenceItem[];
   authorType: string;
   createdAt: string;
 }
@@ -131,6 +135,26 @@ export function FindingEditor({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [linkingItem, setLinkingItem] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<string | null>(f.playbookItemId ?? null);
+  const [aiLoading, setAiLoading] = useState<"draft" | "review" | null>(null);
+  const [aiReview, setAiReview] = useState<{
+    completeness: string;
+    severity: string;
+    suggestions: string[];
+  } | null>(null);
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>(
+    latestVersion?.evidenceUrls ?? []
+  );
+  const nextKeyNum = useRef(
+    Math.max(
+      0,
+      ...(latestVersion?.evidenceUrls ?? []).map((e) => {
+        const m = e.key.match(/fig-(\d+)/);
+        return m ? parseInt(m[1]) : 0;
+      })
+    ) + 1
+  );
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentItem = playbookItems.find((i) => i.id === currentItemId) ?? null;
   const riskMatchesPlaybook = currentItem !== null && riskLevel === currentItem.defaultRisk;
@@ -173,7 +197,7 @@ export function FindingEditor({
         riskLevel,
         cvssScore: cvssScore || null,
         status,
-        evidenceUrls: latestVersion?.evidenceUrls ?? [],
+        evidenceUrls: evidenceItems,
         justification: justification || undefined,
       }),
     });
@@ -206,6 +230,104 @@ export function FindingEditor({
     setHistoryOpen(false);
     router.refresh();
   }
+
+  async function handleAiDraft() {
+    setAiLoading("draft");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/ai/draft`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.error === "AI_NOT_CONFIGURED") {
+          toast.error("AI features require an ANTHROPIC_API_KEY environment variable.");
+        } else {
+          toast.error(data.error ?? "AI draft failed.");
+        }
+        return;
+      }
+      setDescription(data.description ?? "");
+      setRemediation(data.remediation ?? "");
+      toast.success("AI draft complete. Review and save when ready.");
+      router.refresh();
+    } catch {
+      toast.error("AI draft request failed.");
+    } finally {
+      setAiLoading(null);
+    }
+  }
+
+  async function handleAiReview() {
+    setAiLoading("review");
+    setAiReview(null);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/ai/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, description, remediation, riskLevel }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.error === "AI_NOT_CONFIGURED") {
+          toast.error("AI features require an ANTHROPIC_API_KEY environment variable.");
+        } else {
+          toast.error(data.error ?? "AI review failed.");
+        }
+        return;
+      }
+
+      const review = await res.json();
+      setAiReview(review);
+    } catch {
+      toast.error("AI review request failed.");
+    } finally {
+      setAiLoading(null);
+    }
+  }
+
+  async function handleEvidenceUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!fileInputRef.current) return;
+    fileInputRef.current.value = "";
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/evidence`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Upload failed.");
+        return;
+      }
+      const key = `fig-${nextKeyNum.current++}`;
+      setEvidenceItems((prev) => [...prev, { key, url: data.url }]);
+    } catch {
+      toast.error("Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleEvidenceDelete(url: string) {
+    await fetch(`/api/projects/${projectId}/findings/${f.id}/evidence`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    setEvidenceItems((prev) => prev.filter((item) => item.url !== url));
+  }
+
+  const copyKey = useCallback((key: string) => {
+    navigator.clipboard.writeText(`[${key}]`).then(() => toast.success(`Copied [${key}]`));
+  }, []);
 
   return (
     <>
@@ -313,13 +435,91 @@ export function FindingEditor({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-              Evidence
-            </Label>
-            <div className="border border-dashed border-border rounded-lg px-4 py-6 text-center text-sm text-muted-foreground">
-              Evidence upload coming in Phase 2.
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                Evidence
+              </Label>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors cursor-pointer disabled:cursor-default"
+              >
+                {uploading ? (
+                  <IconLoader2 size={13} className="animate-spin" />
+                ) : (
+                  <IconUpload size={13} />
+                )}
+                {uploading ? "Uploading…" : "Upload file"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,application/pdf"
+                className="hidden"
+                onChange={handleEvidenceUpload}
+              />
             </div>
+            {evidenceItems.length === 0 ? (
+              <div
+                className="border border-dashed border-border rounded-lg px-4 py-5 text-center text-xs text-muted-foreground cursor-pointer hover:border-border/60 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                No evidence attached. Click to upload an image or PDF (max 10 MB).
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {evidenceItems.map(({ key, url }) => {
+                  const isImage = /\.(jpe?g|png|gif|webp|svg)(\?|$)/i.test(url);
+                  const proxyUrl = `/api/projects/${projectId}/findings/${f.id}/evidence/proxy?url=${encodeURIComponent(url)}`;
+                  return (
+                    <div
+                      key={url}
+                      className="relative group w-28 h-28 shrink-0 rounded-md overflow-hidden border border-border bg-muted/30"
+                    >
+                      {isImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={proxyUrl} alt={key} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center w-full h-full gap-1">
+                          <IconFile size={22} className="text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground truncate max-w-full px-1">
+                            {url.split("/").pop()?.split("?")[0] ?? "file"}
+                          </span>
+                        </div>
+                      )}
+                      {/* Key badge — click to copy */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          copyKey(key);
+                        }}
+                        className="absolute bottom-1 left-1 bg-background/90 border border-border rounded px-1 py-0.5 text-[10px] font-mono font-medium text-foreground hover:bg-primary hover:text-primary-foreground transition-colors z-10"
+                        title="Click to copy reference"
+                      >
+                        {key}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEvidenceDelete(url)}
+                        className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-destructive-foreground z-10"
+                      >
+                        <IconX size={11} />
+                      </button>
+                      <a
+                        href={proxyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="absolute inset-0"
+                        aria-label="Open evidence"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -420,20 +620,58 @@ export function FindingEditor({
             </div>
           )}
 
-          <div className="pt-2 border-t border-border">
+          <div className="pt-2 border-t border-border space-y-1.5">
             <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wide font-medium">
               AI tools
             </p>
             <Button
               variant="outline"
               size="sm"
-              disabled
-              className="w-full justify-start text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] text-xs"
+              onClick={handleAiDraft}
+              disabled={aiLoading !== null}
+              className="w-full justify-start text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#E4E2FD] text-xs"
             >
-              <IconSparkles size={12} />
-              AI-assisted writing
+              {aiLoading === "draft" ? (
+                <IconLoader2 size={12} className="animate-spin" />
+              ) : (
+                <IconSparkles size={12} />
+              )}
+              Draft finding
             </Button>
-            <p className="text-[10px] text-muted-foreground mt-1.5">Coming in a future release.</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAiReview}
+              disabled={aiLoading !== null}
+              className="w-full justify-start text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#E4E2FD] text-xs"
+            >
+              {aiLoading === "review" ? (
+                <IconLoader2 size={12} className="animate-spin" />
+              ) : (
+                <IconSparkles size={12} />
+              )}
+              Review finding
+            </Button>
+            {aiReview && (
+              <div className="rounded-md border border-[#AFA9EC] bg-[#EEEDFE] p-2.5 space-y-1.5 text-xs">
+                <p className="text-[#3C3489] font-medium">AI Review</p>
+                <p className="text-foreground">{aiReview.completeness}</p>
+                <p className="text-foreground">{aiReview.severity}</p>
+                {aiReview.suggestions.length > 0 && (
+                  <ul className="list-disc pl-3.5 space-y-0.5 text-foreground">
+                    {aiReview.suggestions.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  onClick={() => setAiReview(null)}
+                  className="text-[10px] text-[#3C3489] hover:underline mt-1"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="pt-2 border-t border-border">

@@ -9,7 +9,7 @@ interface ExportFinding {
   status: string;
   description: string | null;
   remediation: string | null;
-  evidenceUrls: string[];
+  evidenceUrls: Array<{ key: string; url: string }>;
 }
 
 interface ReportDocumentProps {
@@ -252,10 +252,10 @@ export function ReportDocument({
             {f.evidenceUrls.length > 0 && (
               <>
                 <Text style={styles.h3}>Evidence</Text>
-                {f.evidenceUrls.map((url) => (
+                {f.evidenceUrls.map(({ key, url }) => (
                   <View key={url} style={styles.bullet}>
                     <Text style={styles.bulletDot}>•</Text>
-                    <Text style={styles.bulletText}>{url}</Text>
+                    <Text style={styles.bulletText}>[{key}] {url}</Text>
                   </View>
                 ))}
               </>

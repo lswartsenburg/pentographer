@@ -11,6 +11,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
+export type EvidenceItem = { key: string; url: string };
+
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 export const riskLevelEnum = pgEnum("risk_level", ["high", "medium", "low", "informational"]);
@@ -141,7 +143,7 @@ export const findingVersion = pgTable("finding_version", {
   riskLevel: riskLevelEnum("risk_level").notNull(),
   cvssScore: numeric("cvss_score", { precision: 4, scale: 1 }),
   status: findingStatusEnum("status").notNull(),
-  evidenceUrls: json("evidence_urls").$type<string[]>().notNull().default([]),
+  evidenceUrls: json("evidence_urls").$type<EvidenceItem[]>().notNull().default([]),
   // authorType is always set server-side; never accepted from the client
   authorType: authorTypeEnum("author_type").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
