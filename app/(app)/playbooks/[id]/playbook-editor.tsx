@@ -54,6 +54,7 @@ type PlaybookVersion = {
   version: string;
   changelog: string | null;
   isActive: boolean;
+  status: string;
   createdAt: Date;
 };
 
@@ -134,6 +135,10 @@ export function PlaybookEditor({
 
   const activeItem = itemDraft ?? selectedItem;
   const showOverview = selectedItem === null;
+
+  const isDraft = version?.status === "draft";
+  const canEdit = isOwner && isDraft;
+  const hasDraft = versions.some((v) => v.status === "draft");
 
   useEffect(() => {
     if (addingItemCategoryId) newItemInputRef.current?.focus();
@@ -293,23 +298,39 @@ export function PlaybookEditor({
     }
   }
 
-  async function newVersion() {
+  async function createDraft() {
     const res = await fetch(`/api/playbooks/${playbook.id}/versions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ changelog: "" }),
     });
 
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      toast.error("Failed to create new version.");
+      toast.error(data.error ?? "Failed to create draft.");
       return;
     }
 
-    toast.success("New version created.");
-    router.refresh();
+    toast.success("Draft created.");
+    router.push(`/playbooks/${playbook.id}?version=${data.id}`);
   }
 
-  const isLatestVersion = versions[0]?.id === version?.id;
+  async function publishVersion() {
+    if (!version) return;
+    const res = await fetch(`/api/playbooks/${playbook.id}/versions/${version.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "published" }),
+    });
+
+    if (!res.ok) {
+      toast.error("Failed to publish.");
+      return;
+    }
+
+    toast.success("Published.");
+    router.refresh();
+  }
 
   return (
     <>
@@ -380,42 +401,53 @@ export function PlaybookEditor({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {versions.map((v, i) => (
+                  {versions.map((v) => (
                     <SelectItem key={v.id} value={v.id} className="text-xs">
-                      v{v.version}
-                      {i === 0 ? " (latest)" : ""}
+                      {v.status === "draft" ? "Draft" : `v${v.version}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
 
-            {/* Read-only / editing badge */}
-            {isOwner ? (
-              <span className="flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+            {/* Status badge */}
+            {isDraft ? (
+              <span className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
                 <IconPencil size={11} />
-                Editing
+                Draft
               </span>
             ) : (
               <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-muted border border-border px-2 py-0.5 rounded-full font-medium">
                 <IconEye size={11} />
-                Read-only
+                Published
               </span>
             )}
 
-            {isOwner && (
+            {/* AI generate — only in draft */}
+            {canEdit && (
               <Button variant="outline" size="sm" onClick={() => setAiGenerateOpen(true)}>
                 <IconSparkles size={14} />
                 AI generate
               </Button>
             )}
-            {isOwner && (
-              <Button variant="outline" size="sm" onClick={newVersion}>
+
+            {/* Create draft — owner viewing published, no draft exists */}
+            {isOwner && !isDraft && !hasDraft && (
+              <Button variant="outline" size="sm" onClick={createDraft}>
                 <IconGitBranch size={14} />
-                New version
+                Create draft
               </Button>
             )}
-            {isOwner && (
+
+            {/* Publish — owner in draft */}
+            {canEdit && (
+              <Button variant="outline" size="sm" onClick={publishVersion}>
+                Publish
+              </Button>
+            )}
+
+            {/* Save — only in draft */}
+            {canEdit && (
               <Button
                 size="sm"
                 onClick={showOverview ? saveOverview : saveItem}
@@ -428,16 +460,30 @@ export function PlaybookEditor({
           </div>
         </header>
 
-        {/* Older version banner */}
-        {!isLatestVersion && version && (
-          <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 text-xs text-amber-700 flex items-center justify-between">
-            <span>You&apos;re viewing v{version.version} — not the latest version.</span>
-            <button
-              className="underline hover:no-underline font-medium"
-              onClick={() => router.push(`/playbooks/${playbook.id}`)}
-            >
-              Switch to latest
-            </button>
+        {/* Published version banner */}
+        {!isDraft && isOwner && (
+          <div className="bg-muted border-b border-border px-5 py-2 text-xs text-muted-foreground flex items-center justify-between">
+            <span>This version is published and locked.</span>
+            {!hasDraft ? (
+              <button className="underline hover:no-underline font-medium" onClick={createDraft}>
+                Create a draft to make changes
+              </button>
+            ) : (
+              <button
+                className="underline hover:no-underline font-medium"
+                onClick={() => {
+                  const draft = versions.find((v) => v.status === "draft");
+                  if (draft) router.push(`/playbooks/${playbook.id}?version=${draft.id}`);
+                }}
+              >
+                Switch to draft
+              </button>
+            )}
+          </div>
+        )}
+        {!isDraft && !isOwner && (
+          <div className="bg-muted border-b border-border px-5 py-2 text-xs text-muted-foreground">
+            This version is published — read-only.
           </div>
         )}
 
@@ -506,8 +552,7 @@ export function PlaybookEditor({
                       ))}
 
                       {/* Add item */}
-                      {isOwner &&
-                        version &&
+                      {canEdit &&
                         (addingItemCategoryId === cat.id ? (
                           <div className="pl-6 pr-3 py-1.5 border-b border-border">
                             <input
@@ -550,7 +595,7 @@ export function PlaybookEditor({
             </div>
 
             {/* Add category */}
-            {isOwner && version && (
+            {canEdit && (
               <div className="border-t border-border p-2">
                 {addingCategory ? (
                   <input
@@ -600,7 +645,7 @@ export function PlaybookEditor({
                   <Input
                     value={overviewDraft.name}
                     onChange={(e) => setOverviewDraft((d) => ({ ...d, name: e.target.value }))}
-                    disabled={!isOwner}
+                    disabled={!canEdit}
                     className="h-8 text-sm"
                   />
                 </div>
@@ -614,7 +659,7 @@ export function PlaybookEditor({
                     onChange={(e) =>
                       setOverviewDraft((d) => ({ ...d, description: e.target.value }))
                     }
-                    disabled={!isOwner}
+                    disabled={!canEdit}
                     placeholder="Describe the scope, methodology, and any reviewer instructions for this playbook…"
                     className="text-xs resize-y"
                   />
@@ -623,9 +668,11 @@ export function PlaybookEditor({
                     scope, approach, and any special instructions.
                   </p>
                 </div>
-                {!isOwner && (
+                {!canEdit && (
                   <p className="text-xs text-muted-foreground bg-muted rounded px-3 py-2">
-                    This is a shared playbook — you can view it but not edit it.
+                    {!isOwner
+                      ? "This is a shared playbook — you can view it but not edit it."
+                      : "This version is published. Create a draft to make changes."}
                   </p>
                 )}
               </div>
@@ -649,7 +696,7 @@ export function PlaybookEditor({
                           d ? { ...d, defaultRisk: v as PlaybookItem["defaultRisk"] } : null
                         )
                       }
-                      disabled={!isOwner}
+                      disabled={!canEdit}
                     >
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue />
@@ -684,7 +731,7 @@ export function PlaybookEditor({
                     onChange={(e) =>
                       setItemDraft((d) => (d ? { ...d, description: e.target.value } : null))
                     }
-                    disabled={!isOwner}
+                    disabled={!canEdit}
                     placeholder="Testing guidance for this issue…"
                   />
                 </div>
@@ -700,7 +747,7 @@ export function PlaybookEditor({
                     onChange={(e) =>
                       setItemDraft((d) => (d ? { ...d, defaultRemediation: e.target.value } : null))
                     }
-                    disabled={!isOwner}
+                    disabled={!canEdit}
                     placeholder="How to fix this issue…"
                   />
                 </div>
@@ -714,7 +761,7 @@ export function PlaybookEditor({
                     <Switch
                       checked={activeItem.active}
                       onCheckedChange={(v) => setItemDraft((d) => (d ? { ...d, active: v } : null))}
-                      disabled={!isOwner}
+                      disabled={!canEdit}
                     />
                   </div>
                 </div>

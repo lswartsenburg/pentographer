@@ -34,10 +34,16 @@ export default async function PlaybookPage({
     .where(eq(playbookVersion.playbookId, id))
     .orderBy(desc(playbookVersion.createdAt));
 
-  const latestVersion = versions[0] ?? null;
+  const isOwner = pb.userId === session.user.id;
+  const draftVersion = versions.find((v) => v.status === "draft") ?? null;
+  const latestPublished = versions.find((v) => v.status !== "draft") ?? null;
+
+  // Default selection: owners land on the draft; everyone else sees latest published
+  const defaultVersion = isOwner ? (draftVersion ?? latestPublished) : latestPublished;
+
   const selectedVersion = versionParam
-    ? (versions.find((v) => v.id === versionParam) ?? latestVersion)
-    : latestVersion;
+    ? (versions.find((v) => v.id === versionParam) ?? defaultVersion)
+    : defaultVersion;
 
   const categories = selectedVersion
     ? await db
@@ -64,7 +70,7 @@ export default async function PlaybookPage({
       version={selectedVersion}
       versions={versions}
       categoriesWithItems={categoriesWithItems}
-      isOwner={pb.userId === session.user.id}
+      isOwner={isOwner}
       initialItemId={initialItemId}
     />
   );

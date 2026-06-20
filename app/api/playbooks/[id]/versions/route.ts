@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and, or, isNull, desc } from "drizzle-orm";
+import { eq, and, or, isNull, desc, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { playbook, playbookVersion, playbookCategory, playbookItem } from "@/db/schema";
@@ -54,6 +54,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (!pb) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Enforce: only one draft at a time
+  const [existingDraft] = await db
+    .select({ id: playbookVersion.id })
+    .from(playbookVersion)
+    .where(and(eq(playbookVersion.playbookId, id), eq(playbookVersion.status, "draft")))
+    .limit(1);
+
+  if (existingDraft)
+    return NextResponse.json(
+      { error: "A draft already exists. Publish it before creating a new one." },
+      { status: 409 }
+    );
+
   let body: unknown;
   try {
     body = await request.json();
@@ -66,16 +79,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  // Get the latest version to clone from
+  // Clone from the latest published version (not any draft)
   const [latestVersion] = await db
     .select()
     .from(playbookVersion)
-    .where(eq(playbookVersion.playbookId, id))
+    .where(and(eq(playbookVersion.playbookId, id), ne(playbookVersion.status, "draft")))
     .orderBy(desc(playbookVersion.createdAt))
     .limit(1);
 
   if (!latestVersion)
-    return NextResponse.json({ error: "No existing version to clone from" }, { status: 400 });
+    return NextResponse.json({ error: "No published version to clone from" }, { status: 400 });
 
   const newVersionNumber = bumpVersion(latestVersion.version);
 
