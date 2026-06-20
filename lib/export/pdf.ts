@@ -11,7 +11,7 @@ interface ExportFinding {
   status: string;
   description: string | null;
   remediation: string | null;
-  evidenceUrls: string[];
+  evidenceUrls: Array<{ key: string; url: string }>;
 }
 
 interface ExportData {

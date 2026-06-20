@@ -11,6 +11,7 @@ import {
   IconSettings,
   IconLogout,
   IconChevronDown,
+  IconTemplate,
 } from "@tabler/icons-react";
 import {
   Sidebar,
@@ -35,6 +36,7 @@ const mainNav = [
   { href: "/dashboard", label: "Dashboard", icon: IconLayoutDashboard },
   { href: "/projects", label: "Projects", icon: IconFolder },
   { href: "/playbooks", label: "Playbooks", icon: IconBook },
+  { href: "/templates", label: "Templates", icon: IconTemplate },
   { href: "/customers", label: "Customers", icon: IconBuilding },
 ];
 

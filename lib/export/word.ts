@@ -22,7 +22,7 @@ interface ExportFinding {
   status: string;
   description: string | null;
   remediation: string | null;
-  evidenceUrls: string[];
+  evidenceUrls: Array<{ key: string; url: string }>;
 }
 
 interface ExportData {
@@ -224,7 +224,9 @@ export async function generateDocx(data: ExportData): Promise<Buffer> {
     if (f.evidenceUrls.length > 0) {
       sections.push(
         new Paragraph({ text: "Evidence", heading: HeadingLevel.HEADING_3 }),
-        ...f.evidenceUrls.map((url) => new Paragraph({ text: url, bullet: { level: 0 } })),
+        ...f.evidenceUrls.map(
+          ({ key, url }) => new Paragraph({ text: `[${key}] ${url}`, bullet: { level: 0 } })
+        ),
         new Paragraph({})
       );
     }

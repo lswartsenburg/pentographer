@@ -1,30 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { IconDownload } from "@tabler/icons-react";
 
+interface TemplateOption {
+  id: string;
+  name: string;
+}
+
 export default function ExportPage() {
   const { id: projectId } = useParams<{ id: string }>();
   const [loading, setLoading] = useState<"docx" | "pdf" | null>(null);
   const [error, setError] = useState("");
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/settings/report-template")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setTemplates(data);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleExport(format: "docx" | "pdf") {
     setError("");
     setLoading(format);
 
+    const body: Record<string, unknown> = { format };
+    if (format === "docx" && selectedTemplateId) {
+      body.templateId = selectedTemplateId;
+    }
+
     const res = await fetch(`/api/projects/${projectId}/export`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ format }),
+      body: JSON.stringify(body),
     });
 
     setLoading(null);
 
     if (!res.ok) {
-      setError("Export failed. Please try again.");
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "Export failed. Please try again.");
       return;
     }
 
@@ -38,6 +60,8 @@ export default function ExportPage() {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
   return (
     <div className="flex flex-col h-full">
@@ -65,10 +89,42 @@ export default function ExportPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="border border-border rounded-lg p-4 space-y-3">
-              <div>
-                <p className="text-sm font-medium">Word document</p>
-                <p className="text-xs text-muted-foreground mt-0.5">.docx format</p>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm font-medium">Word document</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">.docx format</p>
+                </div>
+
+                {templates.length > 0 ? (
+                  <div className="space-y-1">
+                    <select
+                      value={selectedTemplateId}
+                      onChange={(e) => setSelectedTemplateId(e.target.value)}
+                      className="w-full h-8 px-2 rounded-md border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                    >
+                      <option value="">Default layout</option>
+                      {templates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedTemplate
+                        ? `Using: ${selectedTemplate.name}`
+                        : "Using default layout"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    <Link href="/templates" className="underline hover:text-foreground">
+                      Upload a template
+                    </Link>{" "}
+                    to customise output.
+                  </p>
+                )}
               </div>
+
               <Button
                 size="sm"
                 className="w-full"

@@ -12,6 +12,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx db/seed.ts",
     "prepare": "husky",
+    "type-check": "tsc --noEmit",
+    "test:e2e": "playwright test",
     "commit": "cz",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -22,6 +24,7 @@
     }
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
     "@auth/drizzle-adapter": "^1.11.2",
     "@hookform/resolvers": "^5.4.0",
     "@radix-ui/react-accordion": "^1.2.14",
@@ -44,10 +47,12 @@
     "@radix-ui/react-tooltip": "^1.2.10",
     "@react-pdf/renderer": "^4.5.1",
     "@tabler/icons-react": "^3.44.0",
+    "@vercel/blob": "^2.4.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "docx": "^9.7.1",
+    "docxtemplater": "^3.69.0",
     "dompurify": "^3.4.11",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
@@ -56,6 +61,7 @@
     "next": "16.2.4",
     "next-auth": "^5.0.0-beta.31",
     "next-themes": "^0.4.6",
+    "pizzip": "^3.2.0",
     "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -67,6 +73,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
+    "@playwright/test": "^1.61.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/dompurify": "^3.0.5",

@@ -11,6 +11,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
+export type EvidenceItem = { key: string; url: string };
+
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 export const riskLevelEnum = pgEnum("risk_level", ["high", "medium", "low", "informational"]);
@@ -141,7 +143,7 @@ export const findingVersion = pgTable("finding_version", {
   riskLevel: riskLevelEnum("risk_level").notNull(),
   cvssScore: numeric("cvss_score", { precision: 4, scale: 1 }),
   status: findingStatusEnum("status").notNull(),
-  evidenceUrls: json("evidence_urls").$type<string[]>().notNull().default([]),
+  evidenceUrls: json("evidence_urls").$type<EvidenceItem[]>().notNull().default([]),
   // authorType is always set server-side; never accepted from the client
   authorType: authorTypeEnum("author_type").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -156,6 +158,22 @@ export const executiveSummaryVersion = pgTable("executive_summary_version", {
   // authorType is always set server-side; never accepted from the client
   authorType: authorTypeEnum("author_type").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const reportTemplate = pgTable("report_template", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => userAccount.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  version: text("version"),
+  language: text("language"),
+  publishNotes: text("publish_notes"),
+  blobUrl: text("blob_url").notNull(),
+  isPublic: boolean("is_public").notNull().default(false),
+  downloadCount: integer("download_count").notNull().default(0),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 });
 
 export const auditLog = pgTable("audit_log", {
@@ -176,6 +194,11 @@ export const userAccountRelations = relations(userAccount, ({ many }) => ({
   customers: many(customer),
   playbooks: many(playbook),
   projects: many(project),
+  reportTemplates: many(reportTemplate),
+}));
+
+export const reportTemplateRelations = relations(reportTemplate, ({ one }) => ({
+  user: one(userAccount, { fields: [reportTemplate.userId], references: [userAccount.id] }),
 }));
 
 export const customerRelations = relations(customer, ({ one, many }) => ({

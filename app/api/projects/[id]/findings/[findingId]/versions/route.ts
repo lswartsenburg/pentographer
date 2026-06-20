@@ -13,7 +13,10 @@ const saveSchema = z.object({
   riskLevel: z.enum(["high", "medium", "low", "informational"]),
   cvssScore: z.string().nullable().optional(),
   status: z.enum(["draft", "in_review", "confirmed", "informational", "false_positive"]),
-  evidenceUrls: z.array(z.string().url()).max(20).optional(),
+  evidenceUrls: z
+    .array(z.object({ key: z.string().max(50), url: z.string().url() }))
+    .max(20)
+    .optional(),
   justification: z.string().optional(),
   // authorType is NOT in this schema — it is always set server-side
 });

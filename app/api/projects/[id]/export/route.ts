@@ -9,13 +9,16 @@ import {
   findingVersion,
   executiveSummaryVersion,
   auditLog,
+  reportTemplate,
 } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { generateDocx } from "@/lib/export/word";
+import { generateDocxFromTemplate, TemplateRenderError } from "@/lib/export/word-template";
 import { generatePdf } from "@/lib/export/pdf";
 
 const exportSchema = z.object({
   format: z.enum(["docx", "pdf"]),
+  templateId: z.string().uuid().optional(),
 });
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -102,13 +105,43 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const filename = `${proj.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_report.${format}`;
 
   if (format === "docx") {
+    const docxHeaders = {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    };
+
+    const { templateId } = parsed.data;
+    if (templateId) {
+      const [tmpl] = await db
+        .select({ blobUrl: reportTemplate.blobUrl })
+        .from(reportTemplate)
+        .where(and(eq(reportTemplate.id, templateId), eq(reportTemplate.userId, session!.user.id)))
+        .limit(1);
+
+      if (!tmpl) {
+        return NextResponse.json({ error: "Template not found" }, { status: 404 });
+      }
+
+      const templateRes = await fetch(tmpl.blobUrl, {
+        headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+      });
+      if (!templateRes.ok) {
+        return NextResponse.json({ error: "Failed to fetch template" }, { status: 502 });
+      }
+      const templateBuffer = Buffer.from(await templateRes.arrayBuffer());
+      try {
+        const buffer = generateDocxFromTemplate(templateBuffer, exportData);
+        return new NextResponse(buffer as unknown as BodyInit, { headers: docxHeaders });
+      } catch (err) {
+        if (err instanceof TemplateRenderError) {
+          return NextResponse.json({ error: `Template error: ${err.message}` }, { status: 422 });
+        }
+        throw err;
+      }
+    }
+
     const buffer = await generateDocx(exportData);
-    return new NextResponse(buffer as unknown as BodyInit, {
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-      },
-    });
+    return new NextResponse(buffer as unknown as BodyInit, { headers: docxHeaders });
   }
 
   const buffer = await generatePdf(exportData);
