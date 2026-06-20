@@ -11,6 +11,7 @@ import {
   IconDeviceFloppy,
   IconGitBranch,
   IconSparkles,
+  IconLoader2,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type PlaybookItem = {
   id: string;
@@ -102,6 +104,9 @@ export function PlaybookEditor({
   const [selectedItem, setSelectedItem] = useState<PlaybookItem | null>(resolvedInitial);
   const [savingItem, setSavingItem] = useState(false);
   const [itemDraft, setItemDraft] = useState<PlaybookItem | null>(null);
+  const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
+  const [aiGenerateDesc, setAiGenerateDesc] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
 
   const activeItem = itemDraft ?? selectedItem;
 
@@ -144,6 +149,37 @@ export function PlaybookEditor({
     router.refresh();
   }
 
+  async function handleAiGenerate() {
+    if (!version) return;
+    setAiGenerating(true);
+    try {
+      const res = await fetch(`/api/playbooks/${playbook.id}/versions/${version.id}/ai/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appDescription: aiGenerateDesc }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.error === "AI_NOT_CONFIGURED") {
+          toast.error("AI features require an ANTHROPIC_API_KEY environment variable.");
+        } else {
+          toast.error(data.error ?? "AI generation failed.");
+        }
+        return;
+      }
+      toast.success(
+        `Generated ${data.created.categories} categories and ${data.created.items} items.`
+      );
+      setAiGenerateOpen(false);
+      setAiGenerateDesc("");
+      router.refresh();
+    } catch {
+      toast.error("AI generation failed.");
+    } finally {
+      setAiGenerating(false);
+    }
+  }
+
   async function newVersion() {
     const res = await fetch(`/api/playbooks/${playbook.id}/versions`, {
       method: "POST",
@@ -161,196 +197,245 @@ export function PlaybookEditor({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <header className="flex items-center justify-between border-b border-border h-12 px-5 bg-background">
-        <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link href="/playbooks" className="hover:text-foreground">
-            Playbooks
-          </Link>
-          <span>/</span>
-          <span className="text-foreground font-medium">{playbook.name}</span>
-        </nav>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
-            <IconSparkles size={14} />
-            AI generate
-          </Button>
-          {isOwner && (
-            <Button variant="outline" size="sm" onClick={newVersion}>
-              <IconGitBranch size={14} />
-              New version
-            </Button>
-          )}
-          {isOwner && (
-            <Button size="sm" onClick={saveItem} disabled={savingItem || !activeItem}>
-              <IconDeviceFloppy size={14} />
-              Save
-            </Button>
-          )}
-        </div>
-      </header>
+    <>
+      <Dialog open={aiGenerateOpen} onOpenChange={setAiGenerateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>AI Generate Playbook</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {categoriesWithItems.length > 0 && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
+                This version already has {categoriesWithItems.length} categories. Generating will
+                replace all existing content.
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Describe the application type and tech stack. The AI will generate categories and
+              checklist items tailored to it.
+            </p>
+            <Textarea
+              rows={5}
+              placeholder="e.g. A Node.js REST API with JWT authentication, PostgreSQL database, and a React SPA frontend. Users can manage invoices and upload PDF documents."
+              value={aiGenerateDesc}
+              onChange={(e) => setAiGenerateDesc(e.target.value)}
+              className="text-xs resize-none"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setAiGenerateOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleAiGenerate}
+                disabled={aiGenerating || aiGenerateDesc.trim().length < 10}
+                className="bg-[#3C3489] text-white hover:bg-[#2e286a]"
+              >
+                {aiGenerating ? (
+                  <IconLoader2 size={13} className="animate-spin" />
+                ) : (
+                  <IconSparkles size={13} />
+                )}
+                {aiGenerating ? "Generating…" : "Generate"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      <div className="flex flex-1 min-h-0">
-        {/* Left panel — structure tree */}
-        <div className="w-60 shrink-0 bg-background border-r border-border overflow-y-auto">
-          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border">
-            <span className="text-xs font-medium text-foreground">Structure</span>
-            {version && (
-              <span className="text-[11px] bg-[#E6F1FB] text-[#0C447C] px-2 py-0.5 rounded-full font-medium">
-                v{version.version}
-              </span>
+      <div className="flex flex-col h-full">
+        <header className="flex items-center justify-between border-b border-border h-12 px-5 bg-background">
+          <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Link href="/playbooks" className="hover:text-foreground">
+              Playbooks
+            </Link>
+            <span>/</span>
+            <span className="text-foreground font-medium">{playbook.name}</span>
+          </nav>
+          <div className="flex items-center gap-2">
+            {isOwner && (
+              <Button variant="outline" size="sm" onClick={() => setAiGenerateOpen(true)}>
+                <IconSparkles size={14} />
+                AI generate
+              </Button>
+            )}
+            {isOwner && (
+              <Button variant="outline" size="sm" onClick={newVersion}>
+                <IconGitBranch size={14} />
+                New version
+              </Button>
+            )}
+            {isOwner && (
+              <Button size="sm" onClick={saveItem} disabled={savingItem || !activeItem}>
+                <IconDeviceFloppy size={14} />
+                Save
+              </Button>
             )}
           </div>
+        </header>
 
-          {categoriesWithItems.map((cat) => (
-            <div key={cat.id} className="border-b border-border">
-              <button
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/40 transition-colors"
-                onClick={() => setExpanded((e) => ({ ...e, [cat.id]: !e[cat.id] }))}
-              >
-                {expanded[cat.id] ? (
-                  <IconChevronDown size={12} className="text-muted-foreground shrink-0" />
-                ) : (
-                  <IconChevronRight size={12} className="text-muted-foreground shrink-0" />
-                )}
-                <span className="flex-1 text-xs font-medium text-foreground truncate">
-                  {cat.name}
+        <div className="flex flex-1 min-h-0">
+          {/* Left panel — structure tree */}
+          <div className="w-60 shrink-0 bg-background border-r border-border overflow-y-auto">
+            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border">
+              <span className="text-xs font-medium text-foreground">Structure</span>
+              {version && (
+                <span className="text-[11px] bg-[#E6F1FB] text-[#0C447C] px-2 py-0.5 rounded-full font-medium">
+                  v{version.version}
                 </span>
-                <span className="text-[10px] text-muted-foreground">{cat.items.length}</span>
-              </button>
-
-              {expanded[cat.id] && (
-                <>
-                  {cat.items.map((item) => (
-                    <button
-                      key={item.id}
-                      className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors ${
-                        activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
-                      }`}
-                      onClick={() => selectItem(item)}
-                    >
-                      <span
-                        className={`flex-1 text-xs truncate ${
-                          activeItem?.id === item.id
-                            ? "text-[#0C447C] font-medium"
-                            : "text-foreground"
-                        }`}
-                      >
-                        {item.name}
-                      </span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
-                      >
-                        {riskLabels[item.defaultRisk]}
-                      </span>
-                    </button>
-                  ))}
-                  {isOwner && (
-                    <div className="pl-6 pr-3 py-1.5 text-[11px] text-muted-foreground">
-                      + Add item
-                    </div>
-                  )}
-                </>
               )}
             </div>
-          ))}
-        </div>
 
-        {/* Right panel — item detail */}
-        <div className="flex-1 overflow-y-auto p-5">
-          {!activeItem ? (
-            <p className="text-sm text-muted-foreground">
-              Select an item from the list to edit it.
-            </p>
-          ) : (
-            <div className="space-y-5">
-              <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
-                {activeItem.name}
-              </h2>
+            {categoriesWithItems.map((cat) => (
+              <div key={cat.id} className="border-b border-border">
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/40 transition-colors cursor-pointer"
+                  onClick={() => setExpanded((e) => ({ ...e, [cat.id]: !e[cat.id] }))}
+                >
+                  {expanded[cat.id] ? (
+                    <IconChevronDown size={12} className="text-muted-foreground shrink-0" />
+                  ) : (
+                    <IconChevronRight size={12} className="text-muted-foreground shrink-0" />
+                  )}
+                  <span className="flex-1 text-xs font-medium text-foreground truncate">
+                    {cat.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">{cat.items.length}</span>
+                </button>
 
-              <div className="grid grid-cols-2 gap-4">
+                {expanded[cat.id] && (
+                  <>
+                    {cat.items.map((item) => (
+                      <button
+                        key={item.id}
+                        className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors cursor-pointer ${
+                          activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
+                        }`}
+                        onClick={() => selectItem(item)}
+                      >
+                        <span
+                          className={`flex-1 text-xs truncate ${
+                            activeItem?.id === item.id
+                              ? "text-[#0C447C] font-medium"
+                              : "text-foreground"
+                          }`}
+                        >
+                          {item.name}
+                        </span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
+                        >
+                          {riskLabels[item.defaultRisk]}
+                        </span>
+                      </button>
+                    ))}
+                    {isOwner && (
+                      <div className="pl-6 pr-3 py-1.5 text-[11px] text-muted-foreground">
+                        + Add item
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Right panel — item detail */}
+          <div className="flex-1 overflow-y-auto p-5">
+            {!activeItem ? (
+              <p className="text-sm text-muted-foreground">
+                Select an item from the list to edit it.
+              </p>
+            ) : (
+              <div className="space-y-5">
+                <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
+                  {activeItem.name}
+                </h2>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Default risk</Label>
+                    <Select
+                      value={activeItem.defaultRisk}
+                      onValueChange={(v) =>
+                        setItemDraft((d) =>
+                          d ? { ...d, defaultRisk: v as PlaybookItem["defaultRisk"] } : null
+                        )
+                      }
+                      disabled={!isOwner}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="informational">Informational</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Framework ref</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      value={activeItem.name}
+                      disabled
+                      placeholder="e.g. A03:2021"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
-                  <Label>Default risk</Label>
-                  <Select
-                    value={activeItem.defaultRisk}
-                    onValueChange={(v) =>
-                      setItemDraft((d) =>
-                        d ? { ...d, defaultRisk: v as PlaybookItem["defaultRisk"] } : null
-                      )
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                    Description (what to look for)
+                  </Label>
+                  <Textarea
+                    rows={5}
+                    className="text-xs font-mono resize-y"
+                    value={activeItem.description ?? ""}
+                    onChange={(e) =>
+                      setItemDraft((d) => (d ? { ...d, description: e.target.value } : null))
                     }
                     disabled={!isOwner}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="informational">Informational</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    placeholder="Testing guidance for this issue…"
+                  />
                 </div>
+
                 <div className="space-y-1.5">
-                  <Label>Framework ref</Label>
-                  <Input
-                    className="h-8 text-xs"
-                    value={activeItem.name}
-                    disabled
-                    placeholder="e.g. A03:2021"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-                  Description (what to look for)
-                </Label>
-                <Textarea
-                  rows={5}
-                  className="text-xs font-mono resize-y"
-                  value={activeItem.description ?? ""}
-                  onChange={(e) =>
-                    setItemDraft((d) => (d ? { ...d, description: e.target.value } : null))
-                  }
-                  disabled={!isOwner}
-                  placeholder="Testing guidance for this issue…"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-                  Default remediation
-                </Label>
-                <Textarea
-                  rows={4}
-                  className="text-xs font-mono resize-y"
-                  value={activeItem.defaultRemediation ?? ""}
-                  onChange={(e) =>
-                    setItemDraft((d) => (d ? { ...d, defaultRemediation: e.target.value } : null))
-                  }
-                  disabled={!isOwner}
-                  placeholder="How to fix this issue…"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-                  Settings
-                </Label>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-foreground">Active in this version</span>
-                  <Switch
-                    checked={activeItem.active}
-                    onCheckedChange={(v) => setItemDraft((d) => (d ? { ...d, active: v } : null))}
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                    Default remediation
+                  </Label>
+                  <Textarea
+                    rows={4}
+                    className="text-xs font-mono resize-y"
+                    value={activeItem.defaultRemediation ?? ""}
+                    onChange={(e) =>
+                      setItemDraft((d) => (d ? { ...d, defaultRemediation: e.target.value } : null))
+                    }
                     disabled={!isOwner}
+                    placeholder="How to fix this issue…"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                    Settings
+                  </Label>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-foreground">Active in this version</span>
+                    <Switch
+                      checked={activeItem.active}
+                      onCheckedChange={(v) => setItemDraft((d) => (d ? { ...d, active: v } : null))}
+                      disabled={!isOwner}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

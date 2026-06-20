@@ -46,7 +46,8 @@ export async function POST(
   if (!formData) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
   const file = formData.get("file");
-  if (!(file instanceof File)) return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  if (!(file instanceof File))
+    return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
   if (!ALLOWED_TYPES.has(file.type)) {
     return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });

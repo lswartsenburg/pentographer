@@ -255,7 +255,9 @@ export function ReportDocument({
                 {f.evidenceUrls.map(({ key, url }) => (
                   <View key={url} style={styles.bullet}>
                     <Text style={styles.bulletDot}>•</Text>
-                    <Text style={styles.bulletText}>[{key}] {url}</Text>
+                    <Text style={styles.bulletText}>
+                      [{key}] {url}
+                    </Text>
                   </View>
                 ))}
               </>

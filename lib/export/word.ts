@@ -224,7 +224,9 @@ export async function generateDocx(data: ExportData): Promise<Buffer> {
     if (f.evidenceUrls.length > 0) {
       sections.push(
         new Paragraph({ text: "Evidence", heading: HeadingLevel.HEADING_3 }),
-        ...f.evidenceUrls.map(({ key, url }) => new Paragraph({ text: `[${key}] ${url}`, bullet: { level: 0 } })),
+        ...f.evidenceUrls.map(
+          ({ key, url }) => new Paragraph({ text: `[${key}] ${url}`, bullet: { level: 0 } })
+        ),
         new Paragraph({})
       );
     }
