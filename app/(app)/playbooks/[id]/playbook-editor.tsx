@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -12,6 +12,8 @@ import {
   IconGitBranch,
   IconSparkles,
   IconLoader2,
+  IconEye,
+  IconPencil,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,21 +96,52 @@ export function PlaybookEditor({
 }: PlaybookEditorProps) {
   const router = useRouter();
 
-  const allItems = categoriesWithItems.flatMap((c) => c.items);
+  const [localCategories, setLocalCategories] = useState<CategoryWithItems[]>(categoriesWithItems);
+
+  const allItems = localCategories.flatMap((c) => c.items);
   const resolvedInitial =
-    (initialItemId ? allItems.find((i) => i.id === initialItemId) : null) ?? allItems[0] ?? null;
+    (initialItemId ? allItems.find((i) => i.id === initialItemId) : null) ?? null;
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(
     Object.fromEntries(categoriesWithItems.map((c) => [c.id, true]))
   );
+  // null = overview panel; PlaybookItem = item detail
   const [selectedItem, setSelectedItem] = useState<PlaybookItem | null>(resolvedInitial);
   const [savingItem, setSavingItem] = useState(false);
-  const [itemDraft, setItemDraft] = useState<PlaybookItem | null>(null);
+  const [itemDraft, setItemDraft] = useState<PlaybookItem | null>(resolvedInitial);
+
+  // Playbook overview editing
+  const [overviewDraft, setOverviewDraft] = useState({
+    name: playbook.name,
+    description: playbook.description ?? "",
+  });
+  const [savingOverview, setSavingOverview] = useState(false);
+
+  // Add item inline
+  const [addingItemCategoryId, setAddingItemCategoryId] = useState<string | null>(null);
+  const [newItemName, setNewItemName] = useState("");
+  const newItemInputRef = useRef<HTMLInputElement>(null);
+
+  // Add category inline
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const newCategoryInputRef = useRef<HTMLInputElement>(null);
+
+  // AI generate
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
   const [aiGenerateDesc, setAiGenerateDesc] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
 
   const activeItem = itemDraft ?? selectedItem;
+  const showOverview = selectedItem === null;
+
+  useEffect(() => {
+    if (addingItemCategoryId) newItemInputRef.current?.focus();
+  }, [addingItemCategoryId]);
+
+  useEffect(() => {
+    if (addingCategory) newCategoryInputRef.current?.focus();
+  }, [addingCategory]);
 
   function selectItem(item: PlaybookItem) {
     setSelectedItem(item);
@@ -116,12 +149,15 @@ export function PlaybookEditor({
     router.replace(`/playbooks/${playbook.id}?item=${item.id}`, { scroll: false });
   }
 
+  function selectOverview() {
+    setSelectedItem(null);
+    setItemDraft(null);
+    router.replace(`/playbooks/${playbook.id}`, { scroll: false });
+  }
+
   async function saveItem() {
     if (!activeItem || !version) return;
     setSavingItem(true);
-
-    const cat = categoriesWithItems.find((c) => c.id === activeItem.categoryId);
-    if (!cat) return;
 
     const res = await fetch(
       `/api/playbooks/${playbook.id}/versions/${version.id}/categories/${activeItem.categoryId}/items/${activeItem.id}`,
@@ -145,8 +181,85 @@ export function PlaybookEditor({
       return;
     }
 
+    const updated: PlaybookItem = await res.json();
+    setLocalCategories((prev) =>
+      prev.map((c) =>
+        c.id === updated.categoryId
+          ? { ...c, items: c.items.map((i) => (i.id === updated.id ? updated : i)) }
+          : c
+      )
+    );
+    setSelectedItem(updated);
+    setItemDraft({ ...updated });
     toast.success("Item saved.");
-    router.refresh();
+  }
+
+  async function saveOverview() {
+    setSavingOverview(true);
+    const res = await fetch(`/api/playbooks/${playbook.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: overviewDraft.name.trim() || playbook.name,
+        description: overviewDraft.description || null,
+      }),
+    });
+    setSavingOverview(false);
+    if (!res.ok) {
+      toast.error("Failed to save.");
+      return;
+    }
+    toast.success("Playbook saved.");
+  }
+
+  async function addItem(categoryId: string) {
+    const name = newItemName.trim();
+    if (!name || !version) return;
+
+    const res = await fetch(
+      `/api/playbooks/${playbook.id}/versions/${version.id}/categories/${categoryId}/items`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, defaultRisk: "medium", active: true }),
+      }
+    );
+
+    if (!res.ok) {
+      toast.error("Failed to add item.");
+      return;
+    }
+
+    const created: PlaybookItem = await res.json();
+    setLocalCategories((prev) =>
+      prev.map((c) => (c.id === categoryId ? { ...c, items: [...c.items, created] } : c))
+    );
+    setNewItemName("");
+    setAddingItemCategoryId(null);
+    selectItem(created);
+  }
+
+  async function addCategory() {
+    const name = newCategoryName.trim();
+    if (!name || !version) return;
+
+    const res = await fetch(`/api/playbooks/${playbook.id}/versions/${version.id}/categories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, displayOrder: localCategories.length }),
+    });
+
+    if (!res.ok) {
+      toast.error("Failed to add category.");
+      return;
+    }
+
+    const created = await res.json();
+    const newCat: CategoryWithItems = { ...created, items: [] };
+    setLocalCategories((prev) => [...prev, newCat]);
+    setExpanded((e) => ({ ...e, [created.id]: true }));
+    setNewCategoryName("");
+    setAddingCategory(false);
   }
 
   async function handleAiGenerate() {
@@ -196,6 +309,8 @@ export function PlaybookEditor({
     router.refresh();
   }
 
+  const isLatestVersion = versions[0]?.id === version?.id;
+
   return (
     <>
       <Dialog open={aiGenerateOpen} onOpenChange={setAiGenerateOpen}>
@@ -204,9 +319,9 @@ export function PlaybookEditor({
             <DialogTitle>AI Generate Playbook</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            {categoriesWithItems.length > 0 && (
+            {localCategories.length > 0 && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
-                This version already has {categoriesWithItems.length} categories. Generating will
+                This version already has {localCategories.length} categories. Generating will
                 replace all existing content.
               </p>
             )}
@@ -253,6 +368,41 @@ export function PlaybookEditor({
             <span className="text-foreground font-medium">{playbook.name}</span>
           </nav>
           <div className="flex items-center gap-2">
+            {/* Version selector */}
+            {versions.length > 0 && (
+              <Select
+                value={version?.id ?? ""}
+                onValueChange={(vId) => {
+                  router.push(`/playbooks/${playbook.id}?version=${vId}`);
+                }}
+              >
+                <SelectTrigger className="h-7 text-xs w-auto gap-1.5 border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {versions.map((v, i) => (
+                    <SelectItem key={v.id} value={v.id} className="text-xs">
+                      v{v.version}
+                      {i === 0 ? " (latest)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Read-only / editing badge */}
+            {isOwner ? (
+              <span className="flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                <IconPencil size={11} />
+                Editing
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-muted border border-border px-2 py-0.5 rounded-full font-medium">
+                <IconEye size={11} />
+                Read-only
+              </span>
+            )}
+
             {isOwner && (
               <Button variant="outline" size="sm" onClick={() => setAiGenerateOpen(true)}>
                 <IconSparkles size={14} />
@@ -266,7 +416,11 @@ export function PlaybookEditor({
               </Button>
             )}
             {isOwner && (
-              <Button size="sm" onClick={saveItem} disabled={savingItem || !activeItem}>
+              <Button
+                size="sm"
+                onClick={showOverview ? saveOverview : saveItem}
+                disabled={showOverview ? savingOverview : savingItem || !activeItem}
+              >
                 <IconDeviceFloppy size={14} />
                 Save
               </Button>
@@ -274,75 +428,208 @@ export function PlaybookEditor({
           </div>
         </header>
 
+        {/* Older version banner */}
+        {!isLatestVersion && version && (
+          <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 text-xs text-amber-700 flex items-center justify-between">
+            <span>You&apos;re viewing v{version.version} — not the latest version.</span>
+            <button
+              className="underline hover:no-underline font-medium"
+              onClick={() => router.push(`/playbooks/${playbook.id}`)}
+            >
+              Switch to latest
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-1 min-h-0">
           {/* Left panel — structure tree */}
-          <div className="w-60 shrink-0 bg-background border-r border-border overflow-y-auto">
+          <div className="w-60 shrink-0 bg-background border-r border-border overflow-y-auto flex flex-col">
             <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border">
               <span className="text-xs font-medium text-foreground">Structure</span>
-              {version && (
-                <span className="text-[11px] bg-[#E6F1FB] text-[#0C447C] px-2 py-0.5 rounded-full font-medium">
-                  v{version.version}
-                </span>
-              )}
             </div>
 
-            {categoriesWithItems.map((cat) => (
-              <div key={cat.id} className="border-b border-border">
-                <button
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/40 transition-colors cursor-pointer"
-                  onClick={() => setExpanded((e) => ({ ...e, [cat.id]: !e[cat.id] }))}
-                >
-                  {expanded[cat.id] ? (
-                    <IconChevronDown size={12} className="text-muted-foreground shrink-0" />
-                  ) : (
-                    <IconChevronRight size={12} className="text-muted-foreground shrink-0" />
-                  )}
-                  <span className="flex-1 text-xs font-medium text-foreground truncate">
-                    {cat.name}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">{cat.items.length}</span>
-                </button>
+            {/* Overview entry */}
+            <button
+              className={`w-full flex items-center gap-2 px-3.5 py-2.5 text-left text-xs border-b border-border transition-colors cursor-pointer ${
+                showOverview
+                  ? "bg-[#E6F1FB] text-[#0C447C] font-medium"
+                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+              }`}
+              onClick={selectOverview}
+            >
+              Overview
+            </button>
 
-                {expanded[cat.id] && (
-                  <>
-                    {cat.items.map((item) => (
-                      <button
-                        key={item.id}
-                        className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors cursor-pointer ${
-                          activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
-                        }`}
-                        onClick={() => selectItem(item)}
-                      >
-                        <span
-                          className={`flex-1 text-xs truncate ${
-                            activeItem?.id === item.id
-                              ? "text-[#0C447C] font-medium"
-                              : "text-foreground"
-                          }`}
-                        >
-                          {item.name}
-                        </span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
-                        >
-                          {riskLabels[item.defaultRisk]}
-                        </span>
-                      </button>
-                    ))}
-                    {isOwner && (
-                      <div className="pl-6 pr-3 py-1.5 text-[11px] text-muted-foreground">
-                        + Add item
-                      </div>
+            <div className="flex-1">
+              {localCategories.map((cat) => (
+                <div key={cat.id} className="border-b border-border">
+                  <button
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/40 transition-colors cursor-pointer"
+                    onClick={() => setExpanded((e) => ({ ...e, [cat.id]: !e[cat.id] }))}
+                  >
+                    {expanded[cat.id] ? (
+                      <IconChevronDown size={12} className="text-muted-foreground shrink-0" />
+                    ) : (
+                      <IconChevronRight size={12} className="text-muted-foreground shrink-0" />
                     )}
-                  </>
+                    <span className="flex-1 text-xs font-medium text-foreground truncate">
+                      {cat.name}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{cat.items.length}</span>
+                  </button>
+
+                  {expanded[cat.id] && (
+                    <>
+                      {cat.items.map((item) => (
+                        <button
+                          key={item.id}
+                          className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors cursor-pointer ${
+                            activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
+                          }`}
+                          onClick={() => selectItem(item)}
+                        >
+                          <span
+                            className={`flex-1 text-xs truncate ${
+                              activeItem?.id === item.id
+                                ? "text-[#0C447C] font-medium"
+                                : "text-foreground"
+                            }`}
+                          >
+                            {item.name}
+                          </span>
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
+                          >
+                            {riskLabels[item.defaultRisk]}
+                          </span>
+                        </button>
+                      ))}
+
+                      {/* Add item */}
+                      {isOwner &&
+                        version &&
+                        (addingItemCategoryId === cat.id ? (
+                          <div className="pl-6 pr-3 py-1.5 border-b border-border">
+                            <input
+                              ref={newItemInputRef}
+                              value={newItemName}
+                              onChange={(e) => setNewItemName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") addItem(cat.id);
+                                if (e.key === "Escape") {
+                                  setAddingItemCategoryId(null);
+                                  setNewItemName("");
+                                }
+                              }}
+                              onBlur={() => {
+                                if (!newItemName.trim()) {
+                                  setAddingItemCategoryId(null);
+                                  setNewItemName("");
+                                }
+                              }}
+                              placeholder="Item name…"
+                              className="w-full text-[11px] bg-transparent outline-none border-b border-primary text-foreground placeholder:text-muted-foreground"
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            className="w-full pl-6 pr-3 py-1.5 text-left text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors cursor-pointer flex items-center gap-1"
+                            onClick={() => {
+                              setAddingItemCategoryId(cat.id);
+                              setNewItemName("");
+                            }}
+                          >
+                            <IconPlus size={11} />
+                            Add item
+                          </button>
+                        ))}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Add category */}
+            {isOwner && version && (
+              <div className="border-t border-border p-2">
+                {addingCategory ? (
+                  <input
+                    ref={newCategoryInputRef}
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") addCategory();
+                      if (e.key === "Escape") {
+                        setAddingCategory(false);
+                        setNewCategoryName("");
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!newCategoryName.trim()) {
+                        setAddingCategory(false);
+                        setNewCategoryName("");
+                      }
+                    }}
+                    placeholder="Category name…"
+                    className="w-full text-[11px] px-2 py-1.5 bg-transparent outline-none border border-primary rounded text-foreground placeholder:text-muted-foreground"
+                  />
+                ) : (
+                  <button
+                    className="w-full flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer px-1.5 py-1"
+                    onClick={() => setAddingCategory(true)}
+                  >
+                    <IconPlus size={11} />
+                    Add category
+                  </button>
                 )}
               </div>
-            ))}
+            )}
           </div>
 
-          {/* Right panel — item detail */}
+          {/* Right panel */}
           <div className="flex-1 overflow-y-auto p-5">
-            {!activeItem ? (
+            {showOverview ? (
+              <div className="space-y-5 max-w-xl">
+                <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
+                  Overview
+                </h2>
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                    Name
+                  </Label>
+                  <Input
+                    value={overviewDraft.name}
+                    onChange={(e) => setOverviewDraft((d) => ({ ...d, name: e.target.value }))}
+                    disabled={!isOwner}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                    Instructions
+                  </Label>
+                  <Textarea
+                    rows={6}
+                    value={overviewDraft.description}
+                    onChange={(e) =>
+                      setOverviewDraft((d) => ({ ...d, description: e.target.value }))
+                    }
+                    disabled={!isOwner}
+                    placeholder="Describe the scope, methodology, and any reviewer instructions for this playbook…"
+                    className="text-xs resize-y"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    This is shown to reviewers when they open the playbook. Use it to explain the
+                    scope, approach, and any special instructions.
+                  </p>
+                </div>
+                {!isOwner && (
+                  <p className="text-xs text-muted-foreground bg-muted rounded px-3 py-2">
+                    This is a shared playbook — you can view it but not edit it.
+                  </p>
+                )}
+              </div>
+            ) : !activeItem ? (
               <p className="text-sm text-muted-foreground">
                 Select an item from the list to edit it.
               </p>

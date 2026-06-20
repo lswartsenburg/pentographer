@@ -10,13 +10,13 @@ export default async function PlaybookPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ item?: string }>;
+  searchParams: Promise<{ item?: string; version?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const { id } = await params;
-  const { item: initialItemId } = await searchParams;
+  const { item: initialItemId, version: versionParam } = await searchParams;
 
   const [pb] = await db
     .select()
@@ -35,12 +35,15 @@ export default async function PlaybookPage({
     .orderBy(desc(playbookVersion.createdAt));
 
   const latestVersion = versions[0] ?? null;
+  const selectedVersion = versionParam
+    ? (versions.find((v) => v.id === versionParam) ?? latestVersion)
+    : latestVersion;
 
-  const categories = latestVersion
+  const categories = selectedVersion
     ? await db
         .select()
         .from(playbookCategory)
-        .where(eq(playbookCategory.playbookVersionId, latestVersion.id))
+        .where(eq(playbookCategory.playbookVersionId, selectedVersion.id))
         .orderBy(asc(playbookCategory.displayOrder))
     : [];
 
@@ -58,7 +61,7 @@ export default async function PlaybookPage({
   return (
     <PlaybookEditor
       playbook={pb}
-      version={latestVersion}
+      version={selectedVersion}
       versions={versions}
       categoriesWithItems={categoriesWithItems}
       isOwner={pb.userId === session.user.id}
