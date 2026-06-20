@@ -20,13 +20,13 @@
 [ ] Update pointer when hovering playbook items
 [ ] Identify core features for the tool that have a potential to regress. Lets implement e2e tests for them
 [ ] Items in the playbook should have unique URLs
-[ ] Maybe move "Customers" down to the account section?
+[ ] Maybe move "Customers" down to the account section. Lets create new sections in the left sidebar that group things logically togetherW
 [ ] Add hover message to disabled buttons
 [ ] Search reports and findings
 [ ] Write README.md
 [ ] Write CONTRIBUTING.md
 
-[ ] More secure login features
+[ ] More secure login featuresC
 [ ] Electron app version without login/
 
 [ ] Export (Google Docs, PDF, Word) — needs design thought: template customisation, section ordering, branding. Do this last.

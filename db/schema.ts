@@ -160,6 +160,22 @@ export const executiveSummaryVersion = pgTable("executive_summary_version", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const reportTemplate = pgTable("report_template", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => userAccount.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  version: text("version"),
+  language: text("language"),
+  publishNotes: text("publish_notes"),
+  blobUrl: text("blob_url").notNull(),
+  isPublic: boolean("is_public").notNull().default(false),
+  downloadCount: integer("download_count").notNull().default(0),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+});
+
 export const auditLog = pgTable("audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => userAccount.id, {
@@ -178,6 +194,11 @@ export const userAccountRelations = relations(userAccount, ({ many }) => ({
   customers: many(customer),
   playbooks: many(playbook),
   projects: many(project),
+  reportTemplates: many(reportTemplate),
+}));
+
+export const reportTemplateRelations = relations(reportTemplate, ({ one }) => ({
+  user: one(userAccount, { fields: [reportTemplate.userId], references: [userAccount.id] }),
 }));
 
 export const customerRelations = relations(customer, ({ one, many }) => ({
