@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { playbook, playbookVersion } from "@/db/schema";
+import { playbook, playbookVersion, playbookCategory } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 
 const patchSchema = z.object({
@@ -53,4 +53,37 @@ export async function PATCH(
     .returning();
 
   return NextResponse.json(updated);
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; versionId: string }> }
+) {
+  const { session, error } = await requireAuth();
+  if (error) return error;
+  const { id, versionId } = await params;
+
+  const [pb] = await db
+    .select()
+    .from(playbook)
+    .where(and(eq(playbook.id, id), eq(playbook.userId, session!.user.id)))
+    .limit(1);
+
+  if (!pb) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const [version] = await db
+    .select()
+    .from(playbookVersion)
+    .where(and(eq(playbookVersion.id, versionId), eq(playbookVersion.playbookId, id)))
+    .limit(1);
+
+  if (!version) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (version.status !== "draft")
+    return NextResponse.json({ error: "Only draft versions can be deleted" }, { status: 400 });
+
+  // Cascade: delete categories (items cascade via FK)
+  await db.delete(playbookCategory).where(eq(playbookCategory.playbookVersionId, versionId));
+  await db.delete(playbookVersion).where(eq(playbookVersion.id, versionId));
+
+  return new NextResponse(null, { status: 204 });
 }

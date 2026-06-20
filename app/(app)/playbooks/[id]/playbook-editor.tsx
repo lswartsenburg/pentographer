@@ -432,6 +432,20 @@ export function PlaybookEditor({
     router.push(`/playbooks/${playbook.id}?version=${data.id}`);
   }
 
+  async function discardDraft() {
+    if (!version || version.status !== "draft") return;
+    const res = await fetch(`/api/playbooks/${playbook.id}/versions/${version.id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      toast.error("Failed to discard draft.");
+      return;
+    }
+    toast.success("Draft discarded.");
+    router.push(`/playbooks/${playbook.id}`);
+    router.refresh();
+  }
+
   async function publishVersion() {
     if (!version) return;
     const res = await fetch(`/api/playbooks/${playbook.id}/versions/${version.id}`, {
@@ -569,6 +583,18 @@ export function PlaybookEditor({
               <Button variant="outline" size="sm" onClick={createDraft}>
                 <IconGitBranch size={14} />
                 Create draft
+              </Button>
+            )}
+
+            {/* Discard draft — owner in draft */}
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={discardDraft}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                Discard draft
               </Button>
             )}
 

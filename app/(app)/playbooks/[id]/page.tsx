@@ -73,6 +73,7 @@ export default async function PlaybookPage({
 
   return (
     <PlaybookEditor
+      key={selectedVersion?.id ?? "no-version"}
       playbook={pb}
       version={selectedVersion}
       versions={versions}
