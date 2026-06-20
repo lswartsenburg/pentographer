@@ -139,6 +139,8 @@ export function PlaybookEditor({
   const isDraft = version?.status === "draft";
   const canEdit = isOwner && isDraft;
   const hasDraft = versions.some((v) => v.status === "draft");
+  const draftVersion = versions.find((v) => v.status === "draft") ?? null;
+  const latestPublished = versions.find((v) => v.status !== "draft") ?? null;
 
   useEffect(() => {
     if (addingItemCategoryId) newItemInputRef.current?.focus();
@@ -389,39 +391,45 @@ export function PlaybookEditor({
             <span className="text-foreground font-medium">{playbook.name}</span>
           </nav>
           <div className="flex items-center gap-2">
-            {/* Version selector */}
-            {versions.length > 0 && (
-              <Select
-                value={version?.id ?? ""}
-                onValueChange={(vId) => {
-                  router.push(`/playbooks/${playbook.id}?version=${vId}`);
-                }}
-              >
-                <SelectTrigger className="h-7 text-xs w-auto gap-1.5 border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {versions.map((v) => (
-                    <SelectItem key={v.id} value={v.id} className="text-xs">
-                      {v.status === "draft" ? "Draft" : `v${v.version}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Status badge */}
-            {isDraft ? (
-              <span className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
+            {/* Draft / Published toggle */}
+            {draftVersion && latestPublished ? (
+              <div className="flex items-center border border-border rounded-md overflow-hidden text-xs h-7">
+                <button
+                  onClick={() =>
+                    !isDraft && router.push(`/playbooks/${playbook.id}?version=${draftVersion.id}`)
+                  }
+                  className={`px-3 h-full transition-colors ${
+                    isDraft
+                      ? "bg-amber-50 text-amber-700 font-medium cursor-default"
+                      : "text-muted-foreground hover:bg-muted/60 cursor-pointer"
+                  }`}
+                >
+                  Draft
+                </button>
+                <button
+                  onClick={() =>
+                    isDraft &&
+                    router.push(`/playbooks/${playbook.id}?version=${latestPublished.id}`)
+                  }
+                  className={`px-3 h-full border-l border-border transition-colors ${
+                    !isDraft
+                      ? "bg-background text-foreground font-medium cursor-default"
+                      : "text-muted-foreground hover:bg-muted/60 cursor-pointer"
+                  }`}
+                >
+                  v{latestPublished.version}
+                </button>
+              </div>
+            ) : draftVersion ? (
+              <span className="flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-md font-medium h-7">
                 <IconPencil size={11} />
                 Draft
               </span>
-            ) : (
-              <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-muted border border-border px-2 py-0.5 rounded-full font-medium">
-                <IconEye size={11} />
-                Published
+            ) : latestPublished ? (
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-muted border border-border px-2.5 py-0.5 rounded-md font-medium h-7">
+                <IconEye size={11} />v{latestPublished.version}
               </span>
-            )}
+            ) : null}
 
             {/* AI generate — only in draft */}
             {canEdit && (
@@ -459,33 +467,6 @@ export function PlaybookEditor({
             )}
           </div>
         </header>
-
-        {/* Published version banner */}
-        {!isDraft && isOwner && (
-          <div className="bg-muted border-b border-border px-5 py-2 text-xs text-muted-foreground flex items-center justify-between">
-            <span>This version is published and locked.</span>
-            {!hasDraft ? (
-              <button className="underline hover:no-underline font-medium" onClick={createDraft}>
-                Create a draft to make changes
-              </button>
-            ) : (
-              <button
-                className="underline hover:no-underline font-medium"
-                onClick={() => {
-                  const draft = versions.find((v) => v.status === "draft");
-                  if (draft) router.push(`/playbooks/${playbook.id}?version=${draft.id}`);
-                }}
-              >
-                Switch to draft
-              </button>
-            )}
-          </div>
-        )}
-        {!isDraft && !isOwner && (
-          <div className="bg-muted border-b border-border px-5 py-2 text-xs text-muted-foreground">
-            This version is published — read-only.
-          </div>
-        )}
 
         <div className="flex flex-1 min-h-0">
           {/* Left panel — structure tree */}
