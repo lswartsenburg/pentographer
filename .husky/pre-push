@@ -1,4 +1,0 @@
-# E2e tests require the dev server to be running on localhost:3000
-# and TEST_EMAIL / TEST_PASSWORD / TEST_PROJECT_ID to be set in .env.local.
-# Skip with: git push --no-verify
-pnpm test:e2e
