@@ -1,7 +1,17 @@
 import { auth } from "@/auth";
 import { redirect, notFound } from "next/navigation";
 import { db } from "@/db/client";
-import { project, customer, report, reportVersion, finding, findingVersion } from "@/db/schema";
+import {
+  project,
+  customer,
+  report,
+  reportVersion,
+  finding,
+  findingVersion,
+  type riskLevelEnum,
+} from "@/db/schema";
+
+type RiskLevel = (typeof riskLevelEnum.enumValues)[number];
 import { eq, and, desc } from "drizzle-orm";
 import { ReportVersionEditor } from "./report-version-editor";
 
@@ -42,34 +52,48 @@ export default async function ReportVersionPage({
     .limit(1);
   if (!rv) notFound();
 
-  // Resolve findings — snapshot if published, otherwise all current findings
-  const allFindings = await db
-    .select({ id: finding.id, title: finding.title, riskLevel: finding.riskLevel })
-    .from(finding)
-    .where(eq(finding.projectId, projectId));
+  const isPublished = rv.status === "published";
 
-  const snapshot = rv.findingSnapshot;
+  let findings: { id: string; title: string; riskLevel: RiskLevel; status: string }[];
 
-  const findings = await Promise.all(
-    allFindings
-      .filter((f) => !snapshot || snapshot.some((s) => s.findingId === f.id))
-      .map(async (f) => {
-        const fvId = snapshot?.find((s) => s.findingId === f.id)?.findingVersionId;
-        const [fv] = fvId
-          ? await db
-              .select({ status: findingVersion.status })
-              .from(findingVersion)
-              .where(eq(findingVersion.id, fvId))
-              .limit(1)
-          : await db
-              .select({ status: findingVersion.status })
-              .from(findingVersion)
-              .where(eq(findingVersion.findingId, f.id))
-              .orderBy(desc(findingVersion.createdAt))
-              .limit(1);
-        return { ...f, status: fv?.status ?? "draft" };
+  if (isPublished && rv.findingSnapshot) {
+    // Resolve snapshot — each finding pinned to a specific findingVersion
+    const allFindings = await db
+      .select({ id: finding.id, title: finding.title, riskLevel: finding.riskLevel })
+      .from(finding)
+      .where(eq(finding.projectId, projectId));
+
+    findings = await Promise.all(
+      allFindings
+        .filter((f) => rv.findingSnapshot!.some((s) => s.findingId === f.id))
+        .map(async (f) => {
+          const fvId = rv.findingSnapshot!.find((s) => s.findingId === f.id)!.findingVersionId;
+          const [fv] = await db
+            .select({ status: findingVersion.status })
+            .from(findingVersion)
+            .where(eq(findingVersion.id, fvId))
+            .limit(1);
+          return { ...f, status: fv?.status ?? "confirmed" };
+        })
+    );
+  } else {
+    // Draft/in_review — pass all project findings with their current status
+    findings = (await db
+      .select({
+        id: finding.id,
+        title: finding.title,
+        riskLevel: finding.riskLevel,
+        status: finding.status,
       })
-  );
+      .from(finding)
+      .where(eq(finding.projectId, projectId))
+      .orderBy(desc(finding.createdAt))) as {
+      id: string;
+      title: string;
+      riskLevel: RiskLevel;
+      status: string;
+    }[];
+  }
 
   return (
     <ReportVersionEditor
@@ -83,6 +107,7 @@ export default async function ReportVersionPage({
       status={rv.status}
       initialExecSummary={rv.execSummary}
       findings={findings}
+      initialIncludedFindingIds={rv.includedFindingIds ?? null}
     />
   );
 }
