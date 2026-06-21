@@ -204,7 +204,7 @@ export function ProjectSidebar({
               </button>
             </div>
             {testAccounts.map((acc, i) => (
-              <div key={i} className="space-y-0.5">
+              <div key={i} className="rounded-md border border-border p-1.5 space-y-1">
                 <div className="flex gap-1 items-center">
                   <Input
                     value={acc.role}
@@ -225,23 +225,21 @@ export function ProjectSidebar({
                     <IconX size={12} />
                   </button>
                 </div>
-                <div className="flex gap-1 items-center pl-[84px]">
-                  <div className="relative flex-1 min-w-0">
-                    <Input
-                      type={visiblePasswords.has(i) ? "text" : "password"}
-                      value={acc.password ?? ""}
-                      onChange={(e) => updateTestAccount(i, "password", e.target.value)}
-                      placeholder="Password (optional)"
-                      className="h-6 text-[11px] pr-6"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => togglePasswordVisible(i)}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {visiblePasswords.has(i) ? <IconEyeOff size={11} /> : <IconEye size={11} />}
-                    </button>
-                  </div>
+                <div className="relative">
+                  <Input
+                    type={visiblePasswords.has(i) ? "text" : "password"}
+                    value={acc.password ?? ""}
+                    onChange={(e) => updateTestAccount(i, "password", e.target.value)}
+                    placeholder="Password (optional)"
+                    className="h-6 text-[11px] pr-7 w-full"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisible(i)}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {visiblePasswords.has(i) ? <IconEyeOff size={11} /> : <IconEye size={11} />}
+                  </button>
                 </div>
               </div>
             ))}
