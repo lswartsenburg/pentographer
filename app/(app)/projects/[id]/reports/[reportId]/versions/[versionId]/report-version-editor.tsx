@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import {
   IconDownload,
 } from "@tabler/icons-react";
 import Link from "next/link";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 type RiskLevel = "high" | "medium" | "low" | "informational";
 
@@ -99,6 +101,13 @@ export function ReportVersionEditor({
 
   const isPublished = status === "published";
   const apiBase = `/api/projects/${projectId}/reports/${reportId}/versions/${versionId}`;
+
+  const renderedExecSummary = useMemo(() => {
+    if (!isPublished || !execContent) return "";
+    const raw = marked.parse(execContent, { async: false }) as string;
+    if (typeof window !== "undefined") return DOMPurify.sanitize(raw);
+    return raw;
+  }, [isPublished, execContent]);
 
   async function handleSave() {
     setSaving(true);
@@ -446,11 +455,14 @@ export function ReportVersionEditor({
 
           <div className="flex-1 overflow-y-auto p-5">
             {isPublished ? (
-              <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
-                {execContent || (
-                  <span className="text-muted-foreground italic">No executive summary.</span>
-                )}
-              </div>
+              renderedExecSummary ? (
+                <div
+                  className="prose prose-sm max-w-none text-foreground"
+                  dangerouslySetInnerHTML={{ __html: renderedExecSummary }}
+                />
+              ) : (
+                <span className="text-muted-foreground italic text-sm">No executive summary.</span>
+              )
             ) : (
               <MarkdownEditor value={execContent} onChange={setExecContent} />
             )}
