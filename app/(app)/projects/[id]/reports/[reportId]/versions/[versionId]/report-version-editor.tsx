@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   IconSparkles,
   IconLoader2,
   IconCheck,
   IconLock,
   IconChevronRight,
+  IconDownload,
 } from "@tabler/icons-react";
 import Link from "next/link";
 
@@ -78,6 +81,21 @@ export function ReportVersionEditor({
     accuracy: string;
     suggestions: string[];
   } | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"docx" | "pdf">("docx");
+  const [exportTemplateId, setExportTemplateId] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    fetch("/api/settings/report-template")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setTemplates(data);
+      })
+      .catch(() => {});
+  }, [exportOpen]);
 
   const isPublished = status === "published";
   const apiBase = `/api/projects/${projectId}/reports/${reportId}/versions/${versionId}`;
@@ -176,6 +194,43 @@ export function ReportVersionEditor({
     }
   }
 
+  async function handleExport() {
+    setExportLoading(true);
+    const body: Record<string, unknown> = {
+      format: exportFormat,
+      reportVersionId: versionId,
+    };
+    if (exportFormat === "docx" && exportTemplateId) {
+      body.templateId = exportTemplateId;
+    }
+    try {
+      const res = await fetch(`/api/projects/${projectId}/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error ?? "Export failed.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download =
+        res.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ??
+        `report.${exportFormat}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportOpen(false);
+    } catch {
+      toast.error("Export failed.");
+    } finally {
+      setExportLoading(false);
+    }
+  }
+
   const riskCounts = { high: 0, medium: 0, low: 0, informational: 0 };
   for (const f of findings) riskCounts[f.riskLevel]++;
 
@@ -207,6 +262,10 @@ export function ReportVersionEditor({
             {isPublished && <IconLock size={10} />}
             {STATUS_LABEL[status]}
           </span>
+          <Button size="sm" variant="outline" onClick={() => setExportOpen(true)}>
+            <IconDownload size={13} />
+            Export
+          </Button>
           {!isPublished && (
             <>
               <Button size="sm" variant="outline" onClick={handleSave} disabled={saving}>
@@ -224,6 +283,68 @@ export function ReportVersionEditor({
           )}
         </div>
       </header>
+
+      {/* Export dialog */}
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Export report</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label>Format</Label>
+              <div className="flex gap-2">
+                {(["docx", "pdf"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setExportFormat(f)}
+                    className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${
+                      exportFormat === f
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:border-border/80"
+                    }`}
+                  >
+                    {f.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {exportFormat === "docx" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="template-select">Template</Label>
+                <select
+                  id="template-select"
+                  value={exportTemplateId}
+                  onChange={(e) => setExportTemplateId(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                >
+                  <option value="">No template (basic export)</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setExportOpen(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleExport} disabled={exportLoading}>
+                {exportLoading ? (
+                  <IconLoader2 size={13} className="animate-spin" />
+                ) : (
+                  <IconDownload size={13} />
+                )}
+                Download
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-1 min-h-0">
         {/* Left panel — finding summary */}

@@ -122,7 +122,6 @@ export const project = pgTable("project", {
   status: projectStatusEnum("status").notNull().default("in_progress"),
   scope: text("scope"),
   applicationUrl: text("application_url"),
-  reportVersion: text("report_version"),
   testAccounts: json("test_accounts").$type<TestAccount[]>(),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),

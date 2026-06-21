@@ -29,7 +29,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       status: project.status,
       scope: project.scope,
       applicationUrl: project.applicationUrl,
-      reportVersion: project.reportVersion,
       testAccounts: project.testAccounts,
       startDate: project.startDate,
       endDate: project.endDate,
@@ -125,7 +124,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           playbookVersion={proj.playbookVersion ?? null}
           scope={proj.scope ?? null}
           applicationUrl={proj.applicationUrl ?? null}
-          reportVersion={proj.reportVersion ?? null}
           testAccounts={proj.testAccounts ?? null}
           startDate={proj.startDate?.toISOString() ?? null}
           endDate={proj.endDate?.toISOString() ?? null}

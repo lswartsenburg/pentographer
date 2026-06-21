@@ -50,6 +50,13 @@
       "when": 1782067253613,
       "tag": "0006_legal_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782067820658,
+      "tag": "0007_adorable_puff_adder",
+      "breakpoints": true
     }
   ]
 }

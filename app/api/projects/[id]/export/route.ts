@@ -10,9 +10,11 @@ import {
   executiveSummaryVersion,
   auditLog,
   reportTemplate,
+  reportVersion,
   userAccount,
 } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { verifyReportVersionAccess } from "@/lib/project-access";
 import { generateDocx } from "@/lib/export/word";
 import {
   generateDocxFromTemplate,
@@ -25,6 +27,7 @@ import { getStorage } from "@/lib/storage";
 const exportSchema = z.object({
   format: z.enum(["docx", "pdf"]),
   templateId: z.string().uuid().optional(),
+  reportVersionId: z.string().uuid().optional(),
 });
 
 const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -40,7 +43,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       name: project.name,
       scope: project.scope,
       applicationUrl: project.applicationUrl,
-      reportVersion: project.reportVersion,
       testAccounts: project.testAccounts,
       customerName: customer.name,
     })
@@ -69,21 +71,68 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  // Load latest version of each finding, fetching image buffers for DOCX template export
-  const findings = await db.select().from(finding).where(eq(finding.projectId, projectId));
-
   const isTemplateExport = parsed.data.format === "docx" && !!parsed.data.templateId;
 
-  const findingsWithVersions = await Promise.all(
-    findings.map(async (f) => {
-      const [latest] = await db
-        .select()
-        .from(findingVersion)
-        .where(eq(findingVersion.findingId, f.id))
-        .orderBy(desc(findingVersion.createdAt))
-        .limit(1);
+  // Resolve exec summary and report version string
+  let execSummary: string | null = null;
+  let reportVersionString: string | null = null;
+  let findingSnapshotMap: Map<string, string> | null = null; // findingId → findingVersionId
 
-      const evidenceUrls = latest?.evidenceUrls ?? [];
+  if (parsed.data.reportVersionId) {
+    // Find the report this version belongs to — we need reportId for the access check
+    const [rv] = await db
+      .select()
+      .from(reportVersion)
+      .where(eq(reportVersion.id, parsed.data.reportVersionId))
+      .limit(1);
+
+    if (!rv) return NextResponse.json({ error: "Report version not found" }, { status: 404 });
+
+    const access = await verifyReportVersionAccess(session!.user.id, projectId, rv.reportId, rv.id);
+    if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    execSummary = rv.execSummary || null;
+    reportVersionString = rv.version;
+
+    if (rv.findingSnapshot) {
+      findingSnapshotMap = new Map(
+        rv.findingSnapshot.map((s) => [s.findingId, s.findingVersionId])
+      );
+    }
+  } else {
+    // Legacy: use latest executive summary version
+    const [execSummaryRow] = await db
+      .select()
+      .from(executiveSummaryVersion)
+      .where(eq(executiveSummaryVersion.projectId, projectId))
+      .orderBy(desc(executiveSummaryVersion.createdAt))
+      .limit(1);
+    execSummary = execSummaryRow?.content ?? null;
+  }
+
+  // Load findings — restrict to snapshot if one exists
+  const allFindings = await db.select().from(finding).where(eq(finding.projectId, projectId));
+
+  const eligibleFindings = findingSnapshotMap
+    ? allFindings.filter((f) => findingSnapshotMap!.has(f.id))
+    : allFindings;
+
+  const findingsWithVersions = await Promise.all(
+    eligibleFindings.map(async (f) => {
+      let fv;
+      if (findingSnapshotMap?.has(f.id)) {
+        const fvId = findingSnapshotMap.get(f.id)!;
+        [fv] = await db.select().from(findingVersion).where(eq(findingVersion.id, fvId)).limit(1);
+      } else {
+        [fv] = await db
+          .select()
+          .from(findingVersion)
+          .where(eq(findingVersion.findingId, f.id))
+          .orderBy(desc(findingVersion.createdAt))
+          .limit(1);
+      }
+
+      const evidenceUrls = fv?.evidenceUrls ?? [];
 
       let evidenceImages: Array<{ image: Buffer; caption: string }> | undefined;
       if (isTemplateExport && evidenceUrls.length > 0) {
@@ -107,32 +156,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         riskLevel: f.riskLevel,
         cvssScore: f.cvssScore,
         status: f.status,
-        description: latest?.description ?? null,
-        remediation: latest?.remediation ?? null,
+        description: fv?.description ?? null,
+        remediation: fv?.remediation ?? null,
         evidenceUrls,
         evidenceImages,
       };
     })
   );
 
-  const [execSummaryRow] = await db
-    .select()
-    .from(executiveSummaryVersion)
-    .where(eq(executiveSummaryVersion.projectId, projectId))
-    .orderBy(desc(executiveSummaryVersion.createdAt))
-    .limit(1);
-
   const exportData: ExportData = {
     projectName: proj.name,
     customerName: proj.customerName ?? "—",
     scope: proj.scope ?? null,
     applicationUrl: proj.applicationUrl ?? null,
-    reportVersion: proj.reportVersion ?? null,
+    reportVersion: reportVersionString,
     testAccounts: proj.testAccounts ?? null,
     organizationName: user?.organizationName ?? null,
     startDate: null,
     endDate: null,
-    execSummary: execSummaryRow?.content ?? null,
+    execSummary,
     findings: findingsWithVersions,
   };
 
@@ -141,7 +183,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     action: "export",
     resourceType: "project",
     resourceId: projectId,
-    metadata: { format: parsed.data.format },
+    metadata: {
+      format: parsed.data.format,
+      reportVersionId: parsed.data.reportVersionId ?? null,
+    },
   });
 
   const format = parsed.data.format;

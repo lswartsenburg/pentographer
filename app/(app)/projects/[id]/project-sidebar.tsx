@@ -21,7 +21,6 @@ interface ProjectSidebarProps {
   playbookVersion: string | null;
   scope: string | null;
   applicationUrl: string | null;
-  reportVersion: string | null;
   testAccounts: TestAccount[] | null;
   startDate: string | null;
   endDate: string | null;
@@ -50,7 +49,6 @@ export function ProjectSidebar({
   playbookVersion,
   scope,
   applicationUrl: initialApplicationUrl,
-  reportVersion: initialReportVersion,
   testAccounts: initialTestAccounts,
   startDate,
   endDate,
@@ -60,7 +58,6 @@ export function ProjectSidebar({
 }: ProjectSidebarProps) {
   const router = useRouter();
   const [applicationUrl, setApplicationUrl] = useState(initialApplicationUrl ?? "");
-  const [reportVersion, setReportVersion] = useState(initialReportVersion ?? "");
   const [testAccounts, setTestAccounts] = useState<TestAccount[]>(initialTestAccounts ?? []);
   const [saving, setSaving] = useState(false);
 
@@ -83,7 +80,6 @@ export function ProjectSidebar({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         applicationUrl: applicationUrl.trim() || null,
-        reportVersion: reportVersion.trim() || null,
         testAccounts: testAccounts.filter((a) => a.role.trim() || a.username.trim()),
       }),
     });
@@ -178,19 +174,6 @@ export function ProjectSidebar({
               onChange={(e) => setApplicationUrl(e.target.value)}
               placeholder="https://app.example.com"
               className="h-7 text-xs"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-[11px]" htmlFor="report-ver">
-              Report version
-            </Label>
-            <Input
-              id="report-ver"
-              value={reportVersion}
-              onChange={(e) => setReportVersion(e.target.value)}
-              placeholder="1.0"
-              className="h-7 text-xs w-24"
             />
           </div>
 

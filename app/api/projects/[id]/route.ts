@@ -12,7 +12,6 @@ const updateSchema = z.object({
   status: z.enum(["in_progress", "under_review", "complete"]).optional(),
   scope: z.string().max(2000).nullable().optional(),
   applicationUrl: z.string().url().max(2000).nullable().optional(),
-  reportVersion: z.string().max(50).nullable().optional(),
   testAccounts: z.array(testAccountSchema).nullable().optional(),
   startDate: z.string().datetime({ offset: true }).nullable().optional(),
   endDate: z.string().datetime({ offset: true }).nullable().optional(),
@@ -94,7 +93,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (parsed.data.scope !== undefined) updateData.scope = parsed.data.scope;
   if (parsed.data.applicationUrl !== undefined)
     updateData.applicationUrl = parsed.data.applicationUrl;
-  if (parsed.data.reportVersion !== undefined) updateData.reportVersion = parsed.data.reportVersion;
   if (parsed.data.testAccounts !== undefined) updateData.testAccounts = parsed.data.testAccounts;
   if (parsed.data.startDate !== undefined)
     updateData.startDate = parsed.data.startDate ? new Date(parsed.data.startDate) : null;
