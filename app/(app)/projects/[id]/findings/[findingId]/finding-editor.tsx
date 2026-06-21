@@ -309,39 +309,41 @@ export function FindingEditor({
   }
 
   async function uploadEvidenceFile(file: File) {
-    setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/evidence`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(data.error ?? "Upload failed.");
-        return;
-      }
-      const key = `fig-${nextKeyNum.current++}`;
-      setEvidenceItems((prev) => [...prev, { key, url: data.url }]);
-    } catch {
-      toast.error("Upload failed.");
-    } finally {
-      setUploading(false);
+    const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/evidence`, {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error ?? "Upload failed.");
+    const key = `fig-${nextKeyNum.current++}`;
+    setEvidenceItems((prev) => [...prev, { key, url: data.url }]);
+  }
+
+  async function uploadFiles(files: File[]) {
+    if (!files.length) return;
+    setUploading(true);
+    const results = await Promise.allSettled(files.map(uploadEvidenceFile));
+    const failures = results.filter((r) => r.status === "rejected");
+    if (failures.length === 1) {
+      toast.error((failures[0] as PromiseRejectedResult).reason?.message ?? "Upload failed.");
+    } else if (failures.length > 1) {
+      toast.error(`${failures.length} files failed to upload.`);
     }
+    setUploading(false);
   }
 
   function handleEvidenceUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (file) uploadEvidenceFile(file);
+    uploadFiles(files);
   }
 
   function handleEvidenceDrop(e: React.DragEvent) {
     e.preventDefault();
     setEvidenceDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) uploadEvidenceFile(file);
+    uploadFiles(Array.from(e.dataTransfer.files));
   }
 
   async function handleEvidenceDelete(url: string) {
@@ -479,12 +481,13 @@ export function FindingEditor({
                 ) : (
                   <IconUpload size={13} />
                 )}
-                {uploading ? "Uploading…" : "Upload file"}
+                {uploading ? "Uploading…" : "Upload files"}
               </button>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,application/pdf"
+                multiple
                 className="hidden"
                 onChange={handleEvidenceUpload}
               />
