@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DisabledTooltip } from "@/components/ui/disabled-tooltip";
 
 type PlaybookItem = {
   id: string;
@@ -715,19 +716,21 @@ export function PlaybookEditor({
               <Button variant="outline" size="sm" onClick={() => setAiGenerateOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                size="sm"
-                onClick={handleAiGenerate}
-                disabled={aiGenerating || aiGenerateDesc.trim().length < 5}
-                className="bg-[#3C3489] text-white hover:bg-[#2e286a]"
-              >
-                {aiGenerating ? (
-                  <IconLoader2 size={13} className="animate-spin" />
-                ) : (
-                  <IconSparkles size={13} />
-                )}
-                {aiGenerating ? "Generating…" : "Generate"}
-              </Button>
+              <DisabledTooltip label="Enter at least 5 characters to generate">
+                <Button
+                  size="sm"
+                  onClick={handleAiGenerate}
+                  disabled={aiGenerating || aiGenerateDesc.trim().length < 5}
+                  className="bg-[#3C3489] text-white hover:bg-[#2e286a]"
+                >
+                  {aiGenerating ? (
+                    <IconLoader2 size={13} className="animate-spin" />
+                  ) : (
+                    <IconSparkles size={13} />
+                  )}
+                  {aiGenerating ? "Generating…" : "Generate"}
+                </Button>
+              </DisabledTooltip>
             </div>
           </div>
         </DialogContent>
