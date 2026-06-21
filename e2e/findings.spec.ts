@@ -13,15 +13,10 @@ test.describe("Finding creation and save", () => {
 
   test.beforeAll(async () => {
     projectId = process.env.TEST_PROJECT_ID ?? "";
-    if (!projectId) {
-      throw new Error(
-        "TEST_PROJECT_ID must be set to run finding e2e tests.\n" +
-          "Set it to an existing project ID owned by the TEST_EMAIL user."
-      );
-    }
   });
 
   test("creates a new finding and it appears in the project findings list", async ({ page }) => {
+    test.skip(!projectId, "TEST_PROJECT_ID not set — add it to .env.local to enable this test");
     const title = `E2E Test Finding ${Date.now()}`;
 
     // Navigate to the "new finding" form
@@ -81,9 +76,6 @@ test.describe("Finding editor — evidence normalization", () => {
 
   test.beforeAll(async () => {
     projectId = process.env.TEST_PROJECT_ID ?? "";
-    if (!projectId) {
-      throw new Error("TEST_PROJECT_ID must be set to run finding e2e tests.");
-    }
   });
 
   /** Helpers ---------------------------------------------------------------- */
@@ -101,6 +93,7 @@ test.describe("Finding editor — evidence normalization", () => {
    * reload. The normalization function must not break correctly-formatted data.
    * -------------------------------------------------------------------------- */
   test("finding with properly-formatted evidence reloads without crashing", async ({ page }) => {
+    test.skip(!projectId, "TEST_PROJECT_ID not set — add it to .env.local to enable this test");
     const title = `E2E Evidence Test ${Date.now()}`;
 
     // Create a new finding
