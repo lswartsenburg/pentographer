@@ -9,9 +9,19 @@ import {
   WidthType,
   BorderStyle,
   AlignmentType,
+  ImageRun,
   Packer,
 } from "docx";
 import { marked, Tokens } from "marked";
+import { getStorage } from "@/lib/storage";
+
+const DOCX_IMAGE_TYPE: Record<string, "jpg" | "png" | "gif"> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/gif": "gif",
+};
+
+const IMAGE_MIME_TYPES_DOCX = new Set(["image/jpeg", "image/png", "image/gif"]);
 
 type RiskLevel = "high" | "medium" | "low" | "informational";
 
@@ -159,12 +169,15 @@ export async function generateDocx(data: ExportData): Promise<Buffer> {
   sections.push(
     new Paragraph({ text: "Risk Summary", heading: HeadingLevel.HEADING_1 }),
     new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      // 9360 twips = 6.5" content width (Letter, 1" margins); 4 equal columns = 2340 each
+      width: { size: 9360, type: WidthType.DXA },
+      columnWidths: [2340, 2340, 2340, 2340],
       rows: [
         new TableRow({
           children: ["High", "Medium", "Low", "Informational"].map(
             (label) =>
               new TableCell({
+                width: { size: 2340, type: WidthType.DXA },
                 children: [new Paragraph({ text: label, alignment: AlignmentType.CENTER })],
               })
           ),
@@ -173,6 +186,7 @@ export async function generateDocx(data: ExportData): Promise<Buffer> {
           children: [highCount, medCount, lowCount, infoCount].map(
             (count) =>
               new TableCell({
+                width: { size: 2340, type: WidthType.DXA },
                 children: [new Paragraph({ text: String(count), alignment: AlignmentType.CENTER })],
               })
           ),
@@ -222,13 +236,33 @@ export async function generateDocx(data: ExportData): Promise<Buffer> {
     }
 
     if (f.evidenceUrls.length > 0) {
-      sections.push(
-        new Paragraph({ text: "Evidence", heading: HeadingLevel.HEADING_3 }),
-        ...f.evidenceUrls.map(
-          ({ key, url }) => new Paragraph({ text: `[${key}] ${url}`, bullet: { level: 0 } })
-        ),
-        new Paragraph({})
-      );
+      sections.push(new Paragraph({ text: "Evidence", heading: HeadingLevel.HEADING_3 }));
+      for (const { key, url } of f.evidenceUrls) {
+        try {
+          const { body, contentType } = await getStorage().get(url);
+          const imgType = DOCX_IMAGE_TYPE[contentType];
+          if (IMAGE_MIME_TYPES_DOCX.has(contentType) && imgType) {
+            sections.push(
+              new Paragraph({
+                children: [
+                  new ImageRun({
+                    data: body,
+                    type: imgType,
+                    transformation: { width: 480, height: 360 },
+                    altText: { description: key, name: key, title: key },
+                  }),
+                ],
+              }),
+              new Paragraph({ text: key, style: "Caption" })
+            );
+          } else {
+            sections.push(new Paragraph({ text: `[${key}] ${url}`, bullet: { level: 0 } }));
+          }
+        } catch {
+          sections.push(new Paragraph({ text: `[${key}] ${url}`, bullet: { level: 0 } }));
+        }
+      }
+      sections.push(new Paragraph({}));
     }
 
     sections.push(new Paragraph({}));

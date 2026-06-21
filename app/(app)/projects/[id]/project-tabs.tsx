@@ -7,8 +7,16 @@ import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { IconPlus, IconSparkles, IconChevronRight, IconLoader2 } from "@tabler/icons-react";
-import { MarkdownEditor } from "@/components/markdown-editor";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  IconPlus,
+  IconSparkles,
+  IconChevronRight,
+  IconLoader2,
+  IconLock,
+  IconFileText,
+} from "@tabler/icons-react";
 
 type Finding = {
   id: string;
@@ -49,41 +57,66 @@ const statusLabel = (status: string) => {
   return map[status] ?? status;
 };
 
+interface ReportVersionSummary {
+  id: string;
+  version: string;
+  status: "draft" | "in_review" | "published";
+  publishedAt: string | null;
+  createdAt: string;
+}
+
+interface ReportSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  versions: ReportVersionSummary[];
+}
+
 interface ProjectTabsProps {
   projectId: string;
   findings: Finding[];
-  latestExecSummary: { content: string; createdAt: string } | null;
-  execSummaryHistory: Array<{ id: string; authorType: string; createdAt: string }>;
+  reports: ReportSummary[];
   exportHistory: Array<{
     id: string;
     action: string;
     createdAt: string;
-    metadata: Record<string, unknown> | null;
+    format: string | null;
+    exporterName: string | null;
+    reportName: string | null;
+    reportVersion: string | null;
   }>;
 }
 
-export function ProjectTabs({
-  projectId,
-  findings,
-  latestExecSummary,
-  execSummaryHistory,
-  exportHistory,
-}: ProjectTabsProps) {
+const VERSION_STATUS_BADGE: Record<string, string> = {
+  draft: "bg-muted text-muted-foreground",
+  in_review: "bg-[#FAEEDA] text-[#633806]",
+  published: "bg-[#EAF3DE] text-[#27500A]",
+};
+
+const VERSION_STATUS_LABEL: Record<string, string> = {
+  draft: "Draft",
+  in_review: "In Review",
+  published: "Published",
+};
+
+export function ProjectTabs({ projectId, findings, reports, exportHistory }: ProjectTabsProps) {
   const router = useRouter();
-  const [execContent, setExecContent] = useState(latestExecSummary?.content ?? "");
-  const [savingExec, setSavingExec] = useState(false);
-  const [aiExecLoading, setAiExecLoading] = useState<"draft" | "review" | null>(null);
-  const [execReview, setExecReview] = useState<{
-    clarity: string;
-    accuracy: string;
-    suggestions: string[];
-  } | null>(null);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<
     Array<{ itemId: string; name: string; categoryName: string; reason: string }>
   >([]);
   const [addingFinding, setAddingFinding] = useState<string | null>(null);
+  const [newReportOpen, setNewReportOpen] = useState(false);
+  const [newReportName, setNewReportName] = useState("");
+  const [creatingReport, setCreatingReport] = useState(false);
+  const [newVersionForReport, setNewVersionForReport] = useState<{
+    reportId: string;
+    existingVersions: ReportVersionSummary[];
+  } | null>(null);
+  const [newVersionString, setNewVersionString] = useState("");
+  const [newVersionForkId, setNewVersionForkId] = useState("");
+  const [creatingVersion, setCreatingVersion] = useState(false);
 
   async function handleAiSuggest() {
     setSuggestLoading(true);
@@ -139,96 +172,65 @@ export function ProjectTabs({
     }
   }
 
-  async function handleAiExecDraft() {
-    setAiExecLoading("draft");
-    setExecContent("");
-
+  async function handleCreateReport() {
+    if (!newReportName.trim()) return;
+    setCreatingReport(true);
     try {
-      const res = await fetch(`/api/projects/${projectId}/executive-summary/ai/draft`, {
-        method: "POST",
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.error === "AI_NOT_CONFIGURED") {
-          toast.error("AI features require an ANTHROPIC_API_KEY environment variable.");
-        } else {
-          toast.error(data.error ?? "AI draft failed.");
-        }
-        return;
-      }
-
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = JSON.parse(line.slice(6));
-          if (data.field === "content") setExecContent((p) => p + data.text);
-          if (data.done) {
-            toast.success("AI draft complete. Review and save when ready.");
-            router.refresh();
-          }
-          if (data.error) toast.error(`AI error: ${data.error}`);
-        }
-      }
-    } catch {
-      toast.error("AI draft request failed.");
-    } finally {
-      setAiExecLoading(null);
-    }
-  }
-
-  async function handleAiExecReview() {
-    setAiExecLoading("review");
-    setExecReview(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/executive-summary/ai/review`, {
+      const res = await fetch(`/api/projects/${projectId}/reports`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: execContent }),
+        body: JSON.stringify({ name: newReportName.trim() }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.error === "AI_NOT_CONFIGURED") {
-          toast.error("AI features require an ANTHROPIC_API_KEY environment variable.");
-        } else {
-          toast.error(data.error ?? "AI review failed.");
-        }
+        toast.error("Failed to create report.");
         return;
       }
-      const review = await res.json();
-      setExecReview(review);
+      const data = await res.json();
+      setNewReportOpen(false);
+      setNewReportName("");
+      router.refresh();
+      // Navigate directly to the first version of the new report
+      if (data.versions?.[0]?.id) {
+        router.push(`/projects/${projectId}/reports/${data.id}/versions/${data.versions[0].id}`);
+      }
     } catch {
-      toast.error("AI review request failed.");
+      toast.error("Failed to create report.");
     } finally {
-      setAiExecLoading(null);
+      setCreatingReport(false);
     }
   }
 
-  async function saveExecSummary() {
-    setSavingExec(true);
-    const res = await fetch(`/api/projects/${projectId}/executive-summary`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: execContent }),
-    });
-    setSavingExec(false);
-
-    if (!res.ok) {
-      toast.error("Failed to save executive summary.");
-      return;
+  async function handleCreateVersion() {
+    if (!newVersionForReport || !newVersionString.trim()) return;
+    setCreatingVersion(true);
+    try {
+      const body: Record<string, string> = { version: newVersionString.trim() };
+      if (newVersionForkId) body.forkFromVersionId = newVersionForkId;
+      const res = await fetch(
+        `/api/projects/${projectId}/reports/${newVersionForReport.reportId}/versions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
+      if (!res.ok) {
+        toast.error("Failed to create version.");
+        return;
+      }
+      const data = await res.json();
+      setNewVersionForReport(null);
+      setNewVersionString("");
+      setNewVersionForkId("");
+      router.refresh();
+      router.push(
+        `/projects/${projectId}/reports/${newVersionForReport.reportId}/versions/${data.id}`
+      );
+    } catch {
+      toast.error("Failed to create version.");
+    } finally {
+      setCreatingVersion(false);
     }
-
-    toast.success("Executive summary saved.");
-    router.refresh();
   }
 
   return (
@@ -241,10 +243,10 @@ export function ProjectTabs({
           Findings
         </TabsTrigger>
         <TabsTrigger
-          value="executive-summary"
+          value="reports"
           className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground py-2.5 px-3 text-xs"
         >
-          Executive summary
+          Reports
         </TabsTrigger>
         <TabsTrigger
           value="export-history"
@@ -253,6 +255,97 @@ export function ProjectTabs({
           Export history
         </TabsTrigger>
       </TabsList>
+
+      {/* New report dialog */}
+      <Dialog open={newReportOpen} onOpenChange={setNewReportOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>New report</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="report-name">Report name</Label>
+              <Input
+                id="report-name"
+                placeholder="e.g. Final Report"
+                value={newReportName}
+                onChange={(e) => setNewReportName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateReport()}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setNewReportOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCreateReport}
+                disabled={creatingReport || !newReportName.trim()}
+              >
+                {creatingReport ? <IconLoader2 size={13} className="animate-spin" /> : null}
+                Create
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New version dialog */}
+      <Dialog
+        open={!!newVersionForReport}
+        onOpenChange={(open) => !open && setNewVersionForReport(null)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>New version</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="version-string">Version</Label>
+              <Input
+                id="version-string"
+                placeholder="e.g. 1.1"
+                value={newVersionString}
+                onChange={(e) => setNewVersionString(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateVersion()}
+                autoFocus
+              />
+            </div>
+            {newVersionForReport && newVersionForReport.existingVersions.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="fork-from">Copy content from</Label>
+                <select
+                  id="fork-from"
+                  value={newVersionForkId}
+                  onChange={(e) => setNewVersionForkId(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                >
+                  <option value="">Start blank</option>
+                  {newVersionForReport.existingVersions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      v{v.version} ({VERSION_STATUS_LABEL[v.status]})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setNewVersionForReport(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCreateVersion}
+                disabled={creatingVersion || !newVersionString.trim()}
+              >
+                {creatingVersion ? <IconLoader2 size={13} className="animate-spin" /> : null}
+                Create
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* AI suggest dialog */}
       <Dialog open={suggestOpen} onOpenChange={setSuggestOpen}>
@@ -352,67 +445,85 @@ export function ProjectTabs({
         </div>
       </TabsContent>
 
-      {/* Executive summary tab */}
-      <TabsContent value="executive-summary" className="flex-1 overflow-y-auto p-4 mt-0">
+      {/* Reports tab */}
+      <TabsContent value="reports" className="flex-1 overflow-y-auto p-4 mt-0">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-muted-foreground">
-            {execSummaryHistory.length > 0
-              ? `${execSummaryHistory.length} version${execSummaryHistory.length !== 1 ? "s" : ""} saved`
-              : "Not yet saved"}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAiExecReview}
-              disabled={aiExecLoading !== null}
-              className="text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#E4E2FD]"
-            >
-              {aiExecLoading === "review" ? (
-                <IconLoader2 size={13} className="animate-spin" />
-              ) : (
-                <IconSparkles size={13} />
-              )}
-              AI review
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAiExecDraft}
-              disabled={aiExecLoading !== null}
-              className="text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#E4E2FD]"
-            >
-              {aiExecLoading === "draft" ? (
-                <IconLoader2 size={13} className="animate-spin" />
-              ) : (
-                <IconSparkles size={13} />
-              )}
-              AI draft
-            </Button>
-            <Button size="sm" onClick={saveExecSummary} disabled={savingExec}>
-              {savingExec ? "Saving…" : "Save"}
-            </Button>
-          </div>
+          <span className="text-xs text-muted-foreground">
+            {reports.length} report{reports.length !== 1 ? "s" : ""}
+          </span>
+          <Button size="sm" onClick={() => setNewReportOpen(true)}>
+            <IconPlus size={14} />
+            New report
+          </Button>
         </div>
-        <MarkdownEditor value={execContent} onChange={setExecContent} />
-        {execReview && (
-          <div className="mt-3 rounded-md border border-[#AFA9EC] bg-[#EEEDFE] p-3 space-y-1.5 text-xs">
-            <p className="text-[#3C3489] font-medium">AI Review</p>
-            <p className="text-foreground">{execReview.clarity}</p>
-            <p className="text-foreground">{execReview.accuracy}</p>
-            {execReview.suggestions.length > 0 && (
-              <ul className="list-disc pl-3.5 space-y-0.5 text-foreground">
-                {execReview.suggestions.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
-            )}
-            <button
-              onClick={() => setExecReview(null)}
-              className="text-[10px] text-[#3C3489] hover:underline mt-1"
-            >
-              Dismiss
-            </button>
+
+        {reports.length === 0 ? (
+          <div className="border border-dashed border-border rounded-lg px-4 py-8 text-center text-sm text-muted-foreground">
+            No reports yet. Create your first report to get started.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {reports.map((r) => (
+              <div key={r.id} className="border border-border rounded-lg overflow-hidden">
+                <div className="flex items-center gap-2 px-3.5 py-2.5 bg-muted/30">
+                  <IconFileText size={14} className="text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium text-foreground flex-1">{r.name}</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {new Date(r.createdAt).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setNewVersionForReport({ reportId: r.id, existingVersions: r.versions });
+                      setNewVersionString("");
+                      setNewVersionForkId("");
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors"
+                  >
+                    <IconPlus size={11} />
+                    New version
+                  </button>
+                </div>
+                {r.versions.length > 0 && (
+                  <div className="divide-y divide-border">
+                    {r.versions.map((v) => (
+                      <Link
+                        key={v.id}
+                        href={`/projects/${projectId}/reports/${r.id}/versions/${v.id}`}
+                        className="flex items-center gap-3 px-3.5 py-2 hover:bg-muted/20 transition-colors"
+                      >
+                        <span className="text-xs text-muted-foreground w-12 shrink-0">
+                          v{v.version}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${VERSION_STATUS_BADGE[v.status]}`}
+                        >
+                          {v.status === "published" && <IconLock size={9} />}
+                          {VERSION_STATUS_LABEL[v.status]}
+                        </span>
+                        {v.publishedAt && (
+                          <span className="text-[11px] text-muted-foreground">
+                            Published{" "}
+                            {new Date(v.publishedAt).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </span>
+                        )}
+                        <IconChevronRight
+                          size={13}
+                          className="text-muted-foreground ml-auto shrink-0"
+                        />
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </TabsContent>
@@ -426,14 +537,37 @@ export function ProjectTabs({
             {exportHistory.map((e) => (
               <div
                 key={e.id}
-                className="flex items-center gap-3 bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm"
+                className="bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm flex items-start gap-3"
               >
-                <span className="text-foreground font-medium capitalize">
-                  {(e.metadata as Record<string, string> | null)?.format ?? "Export"}
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  {new Date(e.createdAt).toLocaleString()}
-                </span>
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium uppercase text-xs tracking-wide text-foreground">
+                      {e.format ?? "export"}
+                    </span>
+                    {e.reportName && (
+                      <>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-xs text-foreground truncate">
+                          {e.reportName}
+                          {e.reportVersion ? ` v${e.reportVersion}` : ""}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {e.exporterName && <span>{e.exporterName}</span>}
+                    {e.exporterName && <span>·</span>}
+                    <span>
+                      {new Date(e.createdAt).toLocaleString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

@@ -33,6 +33,12 @@ export const projectStatusEnum = pgEnum("project_status", [
 
 export const authorTypeEnum = pgEnum("author_type", ["human", "ai"]);
 
+export const reportVersionStatusEnum = pgEnum("report_version_status", [
+  "draft",
+  "in_review",
+  "published",
+]);
+
 // ─── Tables ──────────────────────────────────────────────────────────────────
 
 export const userAccount = pgTable("user_account", {
@@ -40,6 +46,7 @@ export const userAccount = pgTable("user_account", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  organizationName: text("organization_name"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -98,6 +105,9 @@ export const playbookItem = pgTable("playbook_item", {
   displayOrder: integer("display_order").notNull().default(0),
 });
 
+// password is stored AES-256-GCM encrypted (see lib/crypto.ts); never stored plaintext
+export type TestAccount = { role: string; username: string; encryptedPassword?: string };
+
 export const project = pgTable("project", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -112,6 +122,8 @@ export const project = pgTable("project", {
   name: text("name").notNull(),
   status: projectStatusEnum("status").notNull().default("in_progress"),
   scope: text("scope"),
+  applicationUrl: text("application_url"),
+  testAccounts: json("test_accounts").$type<TestAccount[]>(),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -158,6 +170,36 @@ export const executiveSummaryVersion = pgTable("executive_summary_version", {
   content: text("content").notNull().default(""),
   // authorType is always set server-side; never accepted from the client
   authorType: authorTypeEnum("author_type").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const report = pgTable("report", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => project.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => userAccount.id, { onDelete: "cascade" }),
+  templateId: uuid("template_id"),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type FindingSnapshotItem = { findingId: string; findingVersionId: string };
+
+export const reportVersion = pgTable("report_version", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reportId: uuid("report_id")
+    .notNull()
+    .references(() => report.id, { onDelete: "cascade" }),
+  version: text("version").notNull(),
+  status: reportVersionStatusEnum("status").notNull().default("draft"),
+  execSummary: text("exec_summary").notNull().default(""),
+  authorType: authorTypeEnum("author_type").notNull().default("human"),
+  findingSnapshot: json("finding_snapshot").$type<FindingSnapshotItem[]>(),
+  reportDate: timestamp("report_date"),
+  publishedAt: timestamp("published_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -243,6 +285,7 @@ export const projectRelations = relations(project, ({ one, many }) => ({
   }),
   findings: many(finding),
   executiveSummaryVersions: many(executiveSummaryVersion),
+  reports: many(report),
 }));
 
 export const findingRelations = relations(finding, ({ one, many }) => ({
@@ -260,4 +303,14 @@ export const findingVersionRelations = relations(findingVersion, ({ one }) => ({
 
 export const executiveSummaryVersionRelations = relations(executiveSummaryVersion, ({ one }) => ({
   project: one(project, { fields: [executiveSummaryVersion.projectId], references: [project.id] }),
+}));
+
+export const reportRelations = relations(report, ({ one, many }) => ({
+  project: one(project, { fields: [report.projectId], references: [project.id] }),
+  user: one(userAccount, { fields: [report.userId], references: [userAccount.id] }),
+  versions: many(reportVersion),
+}));
+
+export const reportVersionRelations = relations(reportVersion, ({ one }) => ({
+  report: one(report, { fields: [reportVersion.reportId], references: [report.id] }),
 }));

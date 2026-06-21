@@ -2,13 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { project, auditLog } from "@/db/schema";
+import { project, auditLog, type TestAccount } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { encrypt, decrypt } from "@/lib/crypto";
+
+const testAccountSchema = z.object({
+  role: z.string().max(100),
+  username: z.string().max(200),
+  // plaintext password from client; we encrypt before storing
+  password: z.string().max(500).optional(),
+});
 
 const updateSchema = z.object({
   name: z.string().min(1).max(300).optional(),
   status: z.enum(["in_progress", "under_review", "complete"]).optional(),
   scope: z.string().max(2000).nullable().optional(),
+  applicationUrl: z.string().url().max(2000).nullable().optional(),
+  testAccounts: z.array(testAccountSchema).nullable().optional(),
   startDate: z.string().datetime({ offset: true }).nullable().optional(),
   endDate: z.string().datetime({ offset: true }).nullable().optional(),
   statusJustification: z.string().optional(),
@@ -18,6 +28,37 @@ const BACKWARD_STATUSES: Record<string, string[]> = {
   complete: ["in_progress", "under_review"],
   under_review: ["in_progress"],
 };
+
+function encryptAccounts(
+  accounts: Array<{ role: string; username: string; password?: string }>
+): TestAccount[] {
+  return accounts.map(({ role, username, password }) => ({
+    role,
+    username,
+    ...(password ? { encryptedPassword: encrypt(password) } : {}),
+  }));
+}
+
+function decryptAccounts(
+  accounts: TestAccount[] | null
+): Array<{ role: string; username: string; password?: string }> {
+  if (!accounts) return [];
+  return accounts.map(({ role, username, encryptedPassword }) => ({
+    role,
+    username,
+    ...(encryptedPassword
+      ? {
+          password: (() => {
+            try {
+              return decrypt(encryptedPassword);
+            } catch {
+              return undefined;
+            }
+          })(),
+        }
+      : {}),
+  }));
+}
 
 async function getOwnedProject(userId: string, id: string) {
   const [row] = await db
@@ -36,7 +77,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const row = await getOwnedProject(session!.user.id, id);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json(row);
+  return NextResponse.json({
+    ...row,
+    testAccounts: decryptAccounts(row.testAccounts),
+  });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -87,6 +131,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (parsed.data.name !== undefined) updateData.name = parsed.data.name.trim();
   if (parsed.data.status !== undefined) updateData.status = parsed.data.status;
   if (parsed.data.scope !== undefined) updateData.scope = parsed.data.scope;
+  if (parsed.data.applicationUrl !== undefined)
+    updateData.applicationUrl = parsed.data.applicationUrl;
+  if (parsed.data.testAccounts !== undefined)
+    updateData.testAccounts = parsed.data.testAccounts
+      ? encryptAccounts(parsed.data.testAccounts)
+      : null;
   if (parsed.data.startDate !== undefined)
     updateData.startDate = parsed.data.startDate ? new Date(parsed.data.startDate) : null;
   if (parsed.data.endDate !== undefined)
@@ -94,7 +144,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const [updated] = await db.update(project).set(updateData).where(eq(project.id, id)).returning();
 
-  return NextResponse.json(updated);
+  return NextResponse.json({
+    ...updated,
+    testAccounts: decryptAccounts(updated.testAccounts),
+  });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

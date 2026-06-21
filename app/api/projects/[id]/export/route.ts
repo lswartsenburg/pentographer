@@ -10,17 +10,29 @@ import {
   executiveSummaryVersion,
   auditLog,
   reportTemplate,
+  reportVersion,
+  userAccount,
 } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { verifyReportVersionAccess } from "@/lib/project-access";
+import { decrypt } from "@/lib/crypto";
 import { generateDocx } from "@/lib/export/word";
-import { generateDocxFromTemplate, TemplateRenderError } from "@/lib/export/word-template";
+import {
+  generateDocxFromTemplate,
+  TemplateRenderError,
+  type ExportData,
+} from "@/lib/export/word-template";
 import { generatePdf } from "@/lib/export/pdf";
+import { generateMarkdownZip } from "@/lib/export/markdown";
 import { getStorage } from "@/lib/storage";
 
 const exportSchema = z.object({
-  format: z.enum(["docx", "pdf"]),
+  format: z.enum(["docx", "pdf", "markdown"]),
   templateId: z.string().uuid().optional(),
+  reportVersionId: z.string().uuid().optional(),
 });
+
+const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
@@ -32,6 +44,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       id: project.id,
       name: project.name,
       scope: project.scope,
+      applicationUrl: project.applicationUrl,
+      testAccounts: project.testAccounts,
       customerName: customer.name,
     })
     .from(project)
@@ -40,6 +54,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .limit(1);
 
   if (!proj) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const [user] = await db
+    .select({ organizationName: userAccount.organizationName })
+    .from(userAccount)
+    .where(eq(userAccount.id, session!.user.id))
+    .limit(1);
 
   let body: unknown;
   try {
@@ -53,44 +73,126 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  // Load latest version of each finding
-  const findings = await db.select().from(finding).where(eq(finding.projectId, projectId));
+  const isTemplateExport = parsed.data.format === "docx" && !!parsed.data.templateId;
+
+  // Resolve exec summary and report version string
+  let execSummary: string | null = null;
+  let reportVersionString: string | null = null;
+  let findingSnapshotMap: Map<string, string> | null = null; // findingId → findingVersionId
+
+  if (parsed.data.reportVersionId) {
+    // Find the report this version belongs to — we need reportId for the access check
+    const [rv] = await db
+      .select()
+      .from(reportVersion)
+      .where(eq(reportVersion.id, parsed.data.reportVersionId))
+      .limit(1);
+
+    if (!rv) return NextResponse.json({ error: "Report version not found" }, { status: 404 });
+
+    const access = await verifyReportVersionAccess(session!.user.id, projectId, rv.reportId, rv.id);
+    if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    execSummary = rv.execSummary || null;
+    reportVersionString = rv.version;
+
+    if (rv.findingSnapshot) {
+      findingSnapshotMap = new Map(
+        rv.findingSnapshot.map((s) => [s.findingId, s.findingVersionId])
+      );
+    }
+  } else {
+    // Legacy: use latest executive summary version
+    const [execSummaryRow] = await db
+      .select()
+      .from(executiveSummaryVersion)
+      .where(eq(executiveSummaryVersion.projectId, projectId))
+      .orderBy(desc(executiveSummaryVersion.createdAt))
+      .limit(1);
+    execSummary = execSummaryRow?.content ?? null;
+  }
+
+  // Load findings — restrict to snapshot if one exists
+  const allFindings = await db.select().from(finding).where(eq(finding.projectId, projectId));
+
+  const eligibleFindings = findingSnapshotMap
+    ? allFindings.filter((f) => findingSnapshotMap!.has(f.id))
+    : allFindings;
 
   const findingsWithVersions = await Promise.all(
-    findings.map(async (f) => {
-      const [latest] = await db
-        .select()
-        .from(findingVersion)
-        .where(eq(findingVersion.findingId, f.id))
-        .orderBy(desc(findingVersion.createdAt))
-        .limit(1);
+    eligibleFindings.map(async (f) => {
+      let fv;
+      if (findingSnapshotMap?.has(f.id)) {
+        const fvId = findingSnapshotMap.get(f.id)!;
+        [fv] = await db.select().from(findingVersion).where(eq(findingVersion.id, fvId)).limit(1);
+      } else {
+        [fv] = await db
+          .select()
+          .from(findingVersion)
+          .where(eq(findingVersion.findingId, f.id))
+          .orderBy(desc(findingVersion.createdAt))
+          .limit(1);
+      }
+
+      const evidenceUrls = fv?.evidenceUrls ?? [];
+
+      let evidenceImages: Array<{ image: Buffer; caption: string }> | undefined;
+      if (isTemplateExport && evidenceUrls.length > 0) {
+        const settled = await Promise.allSettled(
+          evidenceUrls.map(async ({ key, url }) => {
+            const result = await getStorage().get(url);
+            if (!IMAGE_MIME_TYPES.has(result.contentType)) return null;
+            return { image: result.body, caption: key };
+          })
+        );
+        evidenceImages = settled
+          .filter(
+            (r): r is PromiseFulfilledResult<{ image: Buffer; caption: string }> =>
+              r.status === "fulfilled" && r.value !== null
+          )
+          .map((r) => r.value);
+      }
 
       return {
         title: f.title,
         riskLevel: f.riskLevel,
         cvssScore: f.cvssScore,
         status: f.status,
-        description: latest?.description ?? null,
-        remediation: latest?.remediation ?? null,
-        evidenceUrls: latest?.evidenceUrls ?? [],
+        description: fv?.description ?? null,
+        remediation: fv?.remediation ?? null,
+        evidenceUrls,
+        evidenceImages,
       };
     })
   );
 
-  const [execSummaryRow] = await db
-    .select()
-    .from(executiveSummaryVersion)
-    .where(eq(executiveSummaryVersion.projectId, projectId))
-    .orderBy(desc(executiveSummaryVersion.createdAt))
-    .limit(1);
-
-  const exportData = {
+  const exportData: ExportData = {
     projectName: proj.name,
     customerName: proj.customerName ?? "—",
-    scope: proj.scope,
+    scope: proj.scope ?? null,
+    applicationUrl: proj.applicationUrl ?? null,
+    reportVersion: reportVersionString,
+    testAccounts: proj.testAccounts
+      ? proj.testAccounts.map(({ role, username, encryptedPassword }) => ({
+          role,
+          username,
+          ...(encryptedPassword
+            ? {
+                password: (() => {
+                  try {
+                    return decrypt(encryptedPassword);
+                  } catch {
+                    return undefined;
+                  }
+                })(),
+              }
+            : {}),
+        }))
+      : null,
+    organizationName: user?.organizationName ?? null,
     startDate: null,
     endDate: null,
-    execSummary: execSummaryRow?.content ?? null,
+    execSummary,
     findings: findingsWithVersions,
   };
 
@@ -99,11 +201,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     action: "export",
     resourceType: "project",
     resourceId: projectId,
-    metadata: { format: parsed.data.format },
+    metadata: {
+      format: parsed.data.format,
+      reportVersionId: parsed.data.reportVersionId ?? null,
+    },
   });
 
   const format = parsed.data.format;
-  const filename = `${proj.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_report.${format}`;
+  const slug = proj.name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  const ext = format === "markdown" ? "zip" : format;
+  const filename = `${slug}_report.${ext}`;
 
   if (format === "docx") {
     const docxHeaders = {
@@ -145,10 +252,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return new NextResponse(buffer as unknown as BodyInit, { headers: docxHeaders });
   }
 
-  const buffer = await generatePdf(exportData);
+  if (format === "pdf") {
+    const buffer = await generatePdf(exportData);
+    return new NextResponse(buffer as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  }
+
+  // markdown zip
+  const buffer = await generateMarkdownZip(exportData);
   return new NextResponse(buffer as unknown as BodyInit, {
     headers: {
-      "Content-Type": "application/pdf",
+      "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });

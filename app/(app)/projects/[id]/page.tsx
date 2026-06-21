@@ -8,33 +8,16 @@ import {
   playbookVersion,
   playbook,
   finding,
-  executiveSummaryVersion,
+  report,
+  reportVersion,
   auditLog,
+  userAccount,
 } from "@/db/schema";
 import { eq, and, desc, count } from "drizzle-orm";
-import { Button } from "@/components/ui/button";
-import { IconDownload, IconPlus, IconSparkles } from "@tabler/icons-react";
 import { ProjectTabs } from "./project-tabs";
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    in_progress: "bg-[#E6F1FB] text-[#0C447C]",
-    under_review: "bg-[#FAEEDA] text-[#633806]",
-    complete: "bg-[#EAF3DE] text-[#27500A]",
-  };
-  const labels: Record<string, string> = {
-    in_progress: "In Progress",
-    under_review: "Under Review",
-    complete: "Complete",
-  };
-  return (
-    <span
-      className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${styles[status] ?? "bg-muted text-muted-foreground"}`}
-    >
-      {labels[status] ?? status}
-    </span>
-  );
-}
+import { ProjectSidebar } from "./project-sidebar";
+import { decrypt } from "@/lib/crypto";
+import type { TestAccount } from "@/db/schema";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -48,6 +31,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       name: project.name,
       status: project.status,
       scope: project.scope,
+      applicationUrl: project.applicationUrl,
+      testAccounts: project.testAccounts,
       startDate: project.startDate,
       endDate: project.endDate,
       createdAt: project.createdAt,
@@ -65,6 +50,23 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .limit(1);
 
   if (!proj) notFound();
+
+  function decryptAccounts(accounts: TestAccount[] | null) {
+    if (!accounts) return null;
+    return accounts.map(({ role, username, encryptedPassword }) => ({
+      role,
+      username,
+      password: encryptedPassword
+        ? (() => {
+            try {
+              return decrypt(encryptedPassword);
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined,
+    }));
+  }
 
   const findings = await db
     .select()
@@ -87,22 +89,33 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .from(finding)
     .where(and(eq(finding.projectId, id), eq(finding.riskLevel, "low")));
 
-  const [latestExecSummary] = await db
+  const reports = await db
     .select()
-    .from(executiveSummaryVersion)
-    .where(eq(executiveSummaryVersion.projectId, id))
-    .orderBy(desc(executiveSummaryVersion.createdAt))
-    .limit(1);
+    .from(report)
+    .where(eq(report.projectId, id))
+    .orderBy(desc(report.createdAt));
 
-  const execSummaryHistory = await db
-    .select()
-    .from(executiveSummaryVersion)
-    .where(eq(executiveSummaryVersion.projectId, id))
-    .orderBy(desc(executiveSummaryVersion.createdAt));
+  const reportsWithVersions = await Promise.all(
+    reports.map(async (r) => {
+      const versions = await db
+        .select()
+        .from(reportVersion)
+        .where(eq(reportVersion.reportId, r.id))
+        .orderBy(desc(reportVersion.createdAt));
+      return { ...r, versions };
+    })
+  );
 
-  const exportHistory = await db
-    .select()
+  const rawExportHistory = await db
+    .select({
+      id: auditLog.id,
+      action: auditLog.action,
+      createdAt: auditLog.createdAt,
+      metadata: auditLog.metadata,
+      exporterName: userAccount.name,
+    })
     .from(auditLog)
+    .leftJoin(userAccount, eq(auditLog.userId, userAccount.id))
     .where(
       and(
         eq(auditLog.resourceType, "project"),
@@ -112,6 +125,29 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     )
     .orderBy(desc(auditLog.createdAt))
     .limit(20);
+
+  // Build a flat map of versionId → { reportName, version } for quick lookup
+  const versionIndex = new Map<string, { reportName: string; version: string }>();
+  for (const r of reportsWithVersions) {
+    for (const v of r.versions) {
+      versionIndex.set(v.id, { reportName: r.name, version: v.version });
+    }
+  }
+
+  const exportHistory = rawExportHistory.map((e) => {
+    const meta = e.metadata as Record<string, string> | null;
+    const rvId = meta?.reportVersionId ?? null;
+    const reportInfo = rvId ? (versionIndex.get(rvId) ?? null) : null;
+    return {
+      id: e.id,
+      action: e.action,
+      createdAt: e.createdAt.toISOString(),
+      format: meta?.format ?? null,
+      exporterName: e.exporterName ?? null,
+      reportName: reportInfo?.reportName ?? null,
+      reportVersion: reportInfo?.version ?? null,
+    };
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -125,87 +161,26 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <span>/</span>
           <span className="text-foreground font-medium">{proj.name}</span>
         </nav>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/projects/${id}/export`}>
-              <IconDownload size={14} />
-              Export
-            </Link>
-          </Button>
-        </div>
+        <div className="flex items-center gap-2" />
       </header>
 
       <div className="flex flex-1 min-h-0">
         {/* Left metadata panel */}
-        <div className="w-64 shrink-0 bg-background border-r border-border overflow-y-auto p-4">
-          <div className="space-y-3 text-sm">
-            <div>
-              <p className="text-[11px] text-muted-foreground mb-0.5">Status</p>
-              <StatusBadge status={proj.status} />
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground mb-0.5">Customer</p>
-              <p className="text-foreground font-medium">{proj.customerName ?? "—"}</p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground mb-0.5">Playbook</p>
-              <p className="text-foreground">
-                {proj.playbookName ? `${proj.playbookName} — v${proj.playbookVersion}` : "—"}
-              </p>
-            </div>
-            {proj.scope && (
-              <div>
-                <p className="text-[11px] text-muted-foreground mb-0.5">Scope</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{proj.scope}</p>
-              </div>
-            )}
-            {proj.startDate && (
-              <div>
-                <p className="text-[11px] text-muted-foreground mb-0.5">Start date</p>
-                <p className="text-foreground">
-                  {new Date(proj.startDate).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-            )}
-            {proj.endDate && (
-              <div>
-                <p className="text-[11px] text-muted-foreground mb-0.5">End date</p>
-                <p className="text-foreground">
-                  {new Date(proj.endDate).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-            )}
-
-            {/* Risk summary */}
-            <div className="pt-2 border-t border-border">
-              <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wide font-medium">
-                Risk summary
-              </p>
-              <div className="grid grid-cols-3 gap-1.5">
-                <div className="bg-[#FCEBEB] rounded-md p-2 text-center">
-                  <p className="text-lg font-semibold text-[#A32D2D]">{highCount?.c ?? 0}</p>
-                  <p className="text-[10px] text-[#A32D2D]">High</p>
-                </div>
-                <div className="bg-[#FAEEDA] rounded-md p-2 text-center">
-                  <p className="text-lg font-semibold text-[#633806]">{medCount?.c ?? 0}</p>
-                  <p className="text-[10px] text-[#633806]">Med</p>
-                </div>
-                <div className="bg-[#EAF3DE] rounded-md p-2 text-center">
-                  <p className="text-lg font-semibold text-[#27500A]">{lowCount?.c ?? 0}</p>
-                  <p className="text-[10px] text-[#27500A]">Low</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProjectSidebar
+          projectId={id}
+          status={proj.status}
+          customerName={proj.customerName ?? null}
+          playbookName={proj.playbookName ?? null}
+          playbookVersion={proj.playbookVersion ?? null}
+          scope={proj.scope ?? null}
+          applicationUrl={proj.applicationUrl ?? null}
+          testAccounts={decryptAccounts(proj.testAccounts ?? null)}
+          startDate={proj.startDate?.toISOString() ?? null}
+          endDate={proj.endDate?.toISOString() ?? null}
+          highCount={highCount?.c ?? 0}
+          medCount={medCount?.c ?? 0}
+          lowCount={lowCount?.c ?? 0}
+        />
 
         {/* Main content tabs */}
         <div className="flex-1 min-w-0 flex flex-col">
@@ -218,25 +193,19 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               status: f.status,
               isAdhoc: f.isAdhoc,
             }))}
-            latestExecSummary={
-              latestExecSummary
-                ? {
-                    content: latestExecSummary.content,
-                    createdAt: latestExecSummary.createdAt.toISOString(),
-                  }
-                : null
-            }
-            execSummaryHistory={execSummaryHistory.map((v) => ({
-              id: v.id,
-              authorType: v.authorType,
-              createdAt: v.createdAt.toISOString(),
+            reports={reportsWithVersions.map((r) => ({
+              id: r.id,
+              name: r.name,
+              createdAt: r.createdAt.toISOString(),
+              versions: r.versions.map((v) => ({
+                id: v.id,
+                version: v.version,
+                status: v.status,
+                publishedAt: v.publishedAt?.toISOString() ?? null,
+                createdAt: v.createdAt.toISOString(),
+              })),
             }))}
-            exportHistory={exportHistory.map((e) => ({
-              id: e.id,
-              action: e.action,
-              createdAt: e.createdAt.toISOString(),
-              metadata: e.metadata as Record<string, unknown> | null,
-            }))}
+            exportHistory={exportHistory}
           />
         </div>
       </div>

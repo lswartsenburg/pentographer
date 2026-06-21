@@ -9,6 +9,7 @@ import { requireAuth } from "@/lib/auth";
 const profileSchema = z.object({
   name: z.string().min(1).max(200),
   email: z.string().email().max(500),
+  organizationName: z.string().max(300).nullable().optional(),
 });
 
 const passwordSchema = z.object({
@@ -66,7 +67,11 @@ export async function PATCH(request: NextRequest) {
 
   await db
     .update(userAccount)
-    .set({ name: parsed.data.name.trim(), email: parsed.data.email.toLowerCase().trim() })
+    .set({
+      name: parsed.data.name.trim(),
+      email: parsed.data.email.toLowerCase().trim(),
+      organizationName: parsed.data.organizationName?.trim() || null,
+    })
     .where(eq(userAccount.id, session!.user.id));
 
   return NextResponse.json({ success: true });
