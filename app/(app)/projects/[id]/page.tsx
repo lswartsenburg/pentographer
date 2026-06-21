@@ -8,12 +8,12 @@ import {
   playbookVersion,
   playbook,
   finding,
-  executiveSummaryVersion,
+  report,
+  reportVersion,
   auditLog,
 } from "@/db/schema";
 import { eq, and, desc, count } from "drizzle-orm";
-import { Button } from "@/components/ui/button";
-import { IconDownload, IconPlus, IconSparkles } from "@tabler/icons-react";
+import { IconPlus, IconSparkles } from "@tabler/icons-react";
 import { ProjectTabs } from "./project-tabs";
 
 function StatusBadge({ status }: { status: string }) {
@@ -87,18 +87,22 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .from(finding)
     .where(and(eq(finding.projectId, id), eq(finding.riskLevel, "low")));
 
-  const [latestExecSummary] = await db
+  const reports = await db
     .select()
-    .from(executiveSummaryVersion)
-    .where(eq(executiveSummaryVersion.projectId, id))
-    .orderBy(desc(executiveSummaryVersion.createdAt))
-    .limit(1);
+    .from(report)
+    .where(eq(report.projectId, id))
+    .orderBy(desc(report.createdAt));
 
-  const execSummaryHistory = await db
-    .select()
-    .from(executiveSummaryVersion)
-    .where(eq(executiveSummaryVersion.projectId, id))
-    .orderBy(desc(executiveSummaryVersion.createdAt));
+  const reportsWithVersions = await Promise.all(
+    reports.map(async (r) => {
+      const versions = await db
+        .select()
+        .from(reportVersion)
+        .where(eq(reportVersion.reportId, r.id))
+        .orderBy(desc(reportVersion.createdAt));
+      return { ...r, versions };
+    })
+  );
 
   const exportHistory = await db
     .select()
@@ -125,14 +129,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <span>/</span>
           <span className="text-foreground font-medium">{proj.name}</span>
         </nav>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/projects/${id}/export`}>
-              <IconDownload size={14} />
-              Export
-            </Link>
-          </Button>
-        </div>
+        <div className="flex items-center gap-2" />
       </header>
 
       <div className="flex flex-1 min-h-0">
@@ -218,18 +215,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               status: f.status,
               isAdhoc: f.isAdhoc,
             }))}
-            latestExecSummary={
-              latestExecSummary
-                ? {
-                    content: latestExecSummary.content,
-                    createdAt: latestExecSummary.createdAt.toISOString(),
-                  }
-                : null
-            }
-            execSummaryHistory={execSummaryHistory.map((v) => ({
-              id: v.id,
-              authorType: v.authorType,
-              createdAt: v.createdAt.toISOString(),
+            reports={reportsWithVersions.map((r) => ({
+              id: r.id,
+              name: r.name,
+              createdAt: r.createdAt.toISOString(),
+              versions: r.versions.map((v) => ({
+                id: v.id,
+                version: v.version,
+                status: v.status,
+                publishedAt: v.publishedAt?.toISOString() ?? null,
+                createdAt: v.createdAt.toISOString(),
+              })),
             }))}
             exportHistory={exportHistory.map((e) => ({
               id: e.id,
