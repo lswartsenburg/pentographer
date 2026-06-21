@@ -29,6 +29,12 @@ export async function GET(
   const url = request.nextUrl.searchParams.get("url");
   if (!url) return NextResponse.json({ error: "url required" }, { status: 400 });
 
+  // Local storage files are served directly via /api/files/... — no proxy needed
+  if (url.startsWith("/api/files/")) {
+    return NextResponse.redirect(new URL(url, request.url));
+  }
+
+  // Vercel Blob: validate hostname before proxying
   let parsed: URL;
   try {
     parsed = new URL(url);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
-import { put, del } from "@vercel/blob";
+import { getStorage } from "@/lib/storage";
 import { db } from "@/db/client";
 import { project, finding } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
@@ -58,10 +58,7 @@ export async function POST(
 
   const filename = `evidence/${projectId}/${findingId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
 
-  const blob = await put(filename, file, {
-    access: "private",
-    token: process.env.BLOB_READ_WRITE_TOKEN,
-  });
+  const blob = await getStorage().put(filename, Buffer.from(await file.arrayBuffer()), file.type);
   return NextResponse.json({ url: blob.url });
 }
 
@@ -81,6 +78,6 @@ export async function DELETE(
     return NextResponse.json({ error: "url required" }, { status: 400 });
   }
 
-  await del(url, { token: process.env.BLOB_READ_WRITE_TOKEN });
+  await getStorage().del(url);
   return NextResponse.json({ deleted: true });
 }

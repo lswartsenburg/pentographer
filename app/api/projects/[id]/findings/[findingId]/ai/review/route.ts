@@ -7,6 +7,7 @@ import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 import { aiErrorMessage } from "@/lib/ai/error";
 import type Anthropic from "@anthropic-ai/sdk";
+import { getStorage } from "@/lib/storage";
 
 const reviewSchema = z.object({
   title: z.string().max(500),
@@ -49,20 +50,15 @@ const REVIEW_TOOL: Anthropic.Tool = {
 const VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 type ValidImageType = (typeof VALID_IMAGE_TYPES)[number];
 
-async function fetchImageBlock(
-  url: string,
-  token: string
-): Promise<Anthropic.Base64ImageSource | null> {
+async function fetchImageBlock(url: string): Promise<Anthropic.Base64ImageSource | null> {
   try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return null;
-    const rawType = (res.headers.get("content-type") ?? "").split(";")[0].trim();
+    const { body, contentType } = await getStorage().get(url);
+    const rawType = contentType.split(";")[0].trim();
     if (!(VALID_IMAGE_TYPES as readonly string[]).includes(rawType)) return null;
-    const buffer = await res.arrayBuffer();
     return {
       type: "base64",
       media_type: rawType as ValidImageType,
-      data: Buffer.from(buffer).toString("base64"),
+      data: body.toString("base64"),
     };
   } catch {
     return null;
@@ -111,13 +107,12 @@ export async function POST(
   const { title, description, remediation, riskLevel, evidenceUrls } = parsed.data;
 
   // Fetch up to 4 evidence images for vision
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN ?? "";
   const imageBlocks: Anthropic.ImageBlockParam[] = [];
   const imageKeys: string[] = [];
 
   for (const item of evidenceUrls.slice(0, 4)) {
     if (!item.url) continue;
-    const src = await fetchImageBlock(item.url, blobToken);
+    const src = await fetchImageBlock(item.url);
     if (!src) continue;
     imageBlocks.push({ type: "image", source: src });
     imageKeys.push(item.key);

@@ -15,6 +15,7 @@ import { requireAuth } from "@/lib/auth";
 import { generateDocx } from "@/lib/export/word";
 import { generateDocxFromTemplate, TemplateRenderError } from "@/lib/export/word-template";
 import { generatePdf } from "@/lib/export/pdf";
+import { getStorage } from "@/lib/storage";
 
 const exportSchema = z.object({
   format: z.enum(["docx", "pdf"]),
@@ -122,13 +123,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: "Template not found" }, { status: 404 });
       }
 
-      const templateRes = await fetch(tmpl.blobUrl, {
-        headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
-      });
-      if (!templateRes.ok) {
+      let templateBuffer: Buffer;
+      try {
+        const { body } = await getStorage().get(tmpl.blobUrl);
+        templateBuffer = body;
+      } catch {
         return NextResponse.json({ error: "Failed to fetch template" }, { status: 502 });
       }
-      const templateBuffer = Buffer.from(await templateRes.arrayBuffer());
       try {
         const buffer = generateDocxFromTemplate(templateBuffer, exportData);
         return new NextResponse(buffer as unknown as BodyInit, { headers: docxHeaders });
