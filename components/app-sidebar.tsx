@@ -32,9 +32,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogoWordmark } from "@/components/logo";
 
-const mainNav = [
+const workNav = [
   { href: "/dashboard", label: "Dashboard", icon: IconLayoutDashboard },
   { href: "/projects", label: "Projects", icon: IconFolder },
+];
+
+const resourcesNav = [
   { href: "/playbooks", label: "Playbooks", icon: IconBook },
   { href: "/templates", label: "Templates", icon: IconTemplate },
   { href: "/customers", label: "Customers", icon: IconBuilding },
@@ -78,9 +81,25 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Main</SidebarGroupLabel>
+          <SidebarGroupLabel>Work</SidebarGroupLabel>
           <SidebarMenu>
-            {mainNav.map(({ href, label, icon: Icon }) => (
+            {workNav.map(({ href, label, icon: Icon }) => (
+              <SidebarMenuItem key={href}>
+                <SidebarMenuButton asChild isActive={isActive(href)} tooltip={label}>
+                  <Link href={href}>
+                    <Icon size={16} />
+                    <span>{label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Resources</SidebarGroupLabel>
+          <SidebarMenu>
+            {resourcesNav.map(({ href, label, icon: Icon }) => (
               <SidebarMenuItem key={href}>
                 <SidebarMenuButton asChild isActive={isActive(href)} tooltip={label}>
                   <Link href={href}>
