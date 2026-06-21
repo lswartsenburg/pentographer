@@ -13,6 +13,10 @@ const reviewSchema = z.object({
   description: z.string().max(50000).optional().default(""),
   remediation: z.string().max(50000).optional().default(""),
   riskLevel: z.enum(["high", "medium", "low", "informational"]),
+  evidenceUrls: z
+    .array(z.object({ key: z.string(), url: z.string() }))
+    .optional()
+    .default([]),
 });
 
 const REVIEW_TOOL: Anthropic.Tool = {
@@ -25,7 +29,7 @@ const REVIEW_TOOL: Anthropic.Tool = {
       completeness: {
         type: "string",
         description:
-          "1-2 sentence assessment of whether the description and remediation are complete and sufficiently detailed.",
+          "1-2 sentence assessment of whether the description and remediation are complete and sufficiently detailed. If evidence images were provided, note whether the description adequately references and explains what they show.",
       },
       severity: {
         type: "string",
@@ -41,6 +45,29 @@ const REVIEW_TOOL: Anthropic.Tool = {
     },
   },
 };
+
+const VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
+type ValidImageType = (typeof VALID_IMAGE_TYPES)[number];
+
+async function fetchImageBlock(
+  url: string,
+  token: string
+): Promise<Anthropic.Base64ImageSource | null> {
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return null;
+    const rawType = (res.headers.get("content-type") ?? "").split(";")[0].trim();
+    if (!(VALID_IMAGE_TYPES as readonly string[]).includes(rawType)) return null;
+    const buffer = await res.arrayBuffer();
+    return {
+      type: "base64",
+      media_type: rawType as ValidImageType,
+      data: Buffer.from(buffer).toString("base64"),
+    };
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(
   request: NextRequest,
@@ -81,18 +108,24 @@ export async function POST(
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { title, description, remediation, riskLevel } = parsed.data;
+  const { title, description, remediation, riskLevel, evidenceUrls } = parsed.data;
 
-  try {
-    const message = await client.messages.create({
-      model: AI_MODEL,
-      max_tokens: 1024,
-      tools: [REVIEW_TOOL],
-      tool_choice: { type: "tool", name: "review_finding" },
-      messages: [
-        {
-          role: "user",
-          content: `You are a senior security consultant reviewing a penetration test finding for quality and completeness.
+  // Fetch up to 4 evidence images for vision
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN ?? "";
+  const imageBlocks: Anthropic.ImageBlockParam[] = [];
+  const imageKeys: string[] = [];
+
+  for (const item of evidenceUrls.slice(0, 4)) {
+    if (!item.url) continue;
+    const src = await fetchImageBlock(item.url, blobToken);
+    if (!src) continue;
+    imageBlocks.push({ type: "image", source: src });
+    imageKeys.push(item.key);
+  }
+
+  const hasImages = imageBlocks.length > 0;
+
+  let prompt = `You are a senior security consultant reviewing a penetration test finding for quality and completeness.
 
 Finding title: ${title}
 Risk level: ${riskLevel}
@@ -101,9 +134,24 @@ Description:
 ${description || "(empty)"}
 
 Remediation:
-${remediation || "(empty)"}`,
-        },
-      ],
+${remediation || "(empty)"}`;
+
+  if (hasImages) {
+    prompt += `\n\nEvidence (${imageBlocks.length} image${imageBlocks.length > 1 ? "s" : ""} attached above, labelled ${imageKeys.join(", ")}): check whether the description clearly references and explains what each piece of evidence demonstrates. Flag it if the description does not mention the evidence.`;
+  }
+
+  const userContent: Anthropic.MessageParam["content"] = [
+    ...imageBlocks,
+    { type: "text", text: prompt },
+  ];
+
+  try {
+    const message = await client.messages.create({
+      model: AI_MODEL,
+      max_tokens: 1024,
+      tools: [REVIEW_TOOL],
+      tool_choice: { type: "tool", name: "review_finding" },
+      messages: [{ role: "user", content: userContent }],
     });
 
     const block = message.content.find((b) => b.type === "tool_use");

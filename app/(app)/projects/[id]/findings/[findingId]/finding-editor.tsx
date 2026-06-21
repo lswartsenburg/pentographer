@@ -21,7 +21,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import {
   IconDeviceFloppy,
@@ -136,6 +138,8 @@ export function FindingEditor({
   const [linkingItem, setLinkingItem] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<string | null>(f.playbookItemId ?? null);
   const [aiLoading, setAiLoading] = useState<"draft" | "review" | null>(null);
+  const [aiDraftOpen, setAiDraftOpen] = useState(false);
+  const [draftInstruction, setDraftInstruction] = useState("");
   const [aiReview, setAiReview] = useState<{
     completeness: string;
     severity: string;
@@ -239,10 +243,13 @@ export function FindingEditor({
   }
 
   async function handleAiDraft() {
+    setAiDraftOpen(false);
     setAiLoading("draft");
     try {
       const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/ai/draft`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instruction: draftInstruction.trim() || undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -255,6 +262,7 @@ export function FindingEditor({
       }
       setDescription(data.description ?? "");
       setRemediation(data.remediation ?? "");
+      setDraftInstruction("");
       toast.success("AI draft complete. Review and save when ready.");
       router.refresh();
     } catch {
@@ -272,7 +280,13 @@ export function FindingEditor({
       const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/ai/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, remediation, riskLevel }),
+        body: JSON.stringify({
+          title,
+          description,
+          remediation,
+          riskLevel,
+          evidenceUrls: evidenceItems,
+        }),
       });
 
       if (!res.ok) {
@@ -662,20 +676,57 @@ export function FindingEditor({
             <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wide font-medium">
               AI tools
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAiDraft}
-              disabled={aiLoading !== null}
-              className="w-full justify-start text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#E4E2FD] text-xs"
-            >
-              {aiLoading === "draft" ? (
-                <IconLoader2 size={12} className="animate-spin" />
-              ) : (
-                <IconSparkles size={12} />
-              )}
-              Draft finding
-            </Button>
+            <Dialog open={aiDraftOpen} onOpenChange={setAiDraftOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={aiLoading !== null}
+                  className="w-full justify-start text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#E4E2FD] text-xs"
+                >
+                  {aiLoading === "draft" ? (
+                    <IconLoader2 size={12} className="animate-spin" />
+                  ) : (
+                    <IconSparkles size={12} />
+                  )}
+                  Draft finding
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Draft finding with AI</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 py-1">
+                  <p className="text-xs text-muted-foreground">
+                    AI will use the finding title, risk level, linked playbook item
+                    {evidenceItems.length > 0
+                      ? `, and ${evidenceItems.length} attached evidence image${evidenceItems.length > 1 ? "s" : ""}`
+                      : ""}
+                    {description || remediation ? ", and your existing draft" : ""} to write a
+                    professional finding.
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Instructions (optional)</Label>
+                    <Textarea
+                      rows={3}
+                      className="text-xs resize-none"
+                      placeholder="e.g. Focus on the business impact, highlight the authentication bypass angle, write in a more formal tone…"
+                      value={draftInstruction}
+                      onChange={(e) => setDraftInstruction(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" size="sm" onClick={() => setAiDraftOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={handleAiDraft}>
+                    <IconSparkles size={12} />
+                    Generate
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Button
               variant="outline"
               size="sm"
