@@ -169,13 +169,15 @@ export async function generateDocx(data: ExportData): Promise<Buffer> {
   sections.push(
     new Paragraph({ text: "Risk Summary", heading: HeadingLevel.HEADING_1 }),
     new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      // 9360 twips = 6.5" content width (Letter, 1" margins); 4 equal columns = 2340 each
+      width: { size: 9360, type: WidthType.DXA },
+      columnWidths: [2340, 2340, 2340, 2340],
       rows: [
         new TableRow({
           children: ["High", "Medium", "Low", "Informational"].map(
             (label) =>
               new TableCell({
-                width: { size: 25, type: WidthType.PERCENTAGE },
+                width: { size: 2340, type: WidthType.DXA },
                 children: [new Paragraph({ text: label, alignment: AlignmentType.CENTER })],
               })
           ),
@@ -184,7 +186,7 @@ export async function generateDocx(data: ExportData): Promise<Buffer> {
           children: [highCount, medCount, lowCount, infoCount].map(
             (count) =>
               new TableCell({
-                width: { size: 25, type: WidthType.PERCENTAGE },
+                width: { size: 2340, type: WidthType.DXA },
                 children: [new Paragraph({ text: String(count), alignment: AlignmentType.CENTER })],
               })
           ),
