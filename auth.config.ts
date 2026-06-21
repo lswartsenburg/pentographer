@@ -13,6 +13,11 @@ export const authConfig: NextAuthConfig = {
         return true;
       }
 
+      // Public pages accessible to everyone regardless of auth state
+      if (nextUrl.pathname.startsWith("/security")) {
+        return true;
+      }
+
       const isAuthPage =
         nextUrl.pathname.startsWith("/login") || nextUrl.pathname.startsWith("/register");
 
