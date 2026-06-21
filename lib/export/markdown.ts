@@ -113,11 +113,15 @@ export async function generateMarkdownZip(data: ExportData): Promise<Buffer> {
     lines.push("");
   }
 
-  // Executive summary
+  // Executive summary — strip a leading heading line if the content already has one
   if (data.execSummary?.trim()) {
+    const execContent = data.execSummary
+      .trim()
+      .replace(/^#{1,6}\s+.*\n?/, "")
+      .trim();
     lines.push("## Executive Summary");
     lines.push("");
-    lines.push(data.execSummary.trim());
+    if (execContent) lines.push(execContent);
     lines.push("");
   }
 
