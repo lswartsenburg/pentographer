@@ -61,7 +61,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="bg-card border border-border rounded-lg p-6 shadow-sm space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form method="post" onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="name">Full name</Label>
               <Input
