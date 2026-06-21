@@ -32,6 +32,7 @@ interface ExportFinding {
 interface TestAccount {
   role: string;
   username: string;
+  password?: string;
 }
 
 export interface ExportData {

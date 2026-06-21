@@ -105,7 +105,8 @@ export const playbookItem = pgTable("playbook_item", {
   displayOrder: integer("display_order").notNull().default(0),
 });
 
-export type TestAccount = { role: string; username: string };
+// password is stored AES-256-GCM encrypted (see lib/crypto.ts); never stored plaintext
+export type TestAccount = { role: string; username: string; encryptedPassword?: string };
 
 export const project = pgTable("project", {
   id: uuid("id").primaryKey().defaultRandom(),

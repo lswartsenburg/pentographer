@@ -15,6 +15,8 @@ import {
 import { eq, and, desc, count } from "drizzle-orm";
 import { ProjectTabs } from "./project-tabs";
 import { ProjectSidebar } from "./project-sidebar";
+import { decrypt } from "@/lib/crypto";
+import type { TestAccount } from "@/db/schema";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -47,6 +49,23 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .limit(1);
 
   if (!proj) notFound();
+
+  function decryptAccounts(accounts: TestAccount[] | null) {
+    if (!accounts) return null;
+    return accounts.map(({ role, username, encryptedPassword }) => ({
+      role,
+      username,
+      password: encryptedPassword
+        ? (() => {
+            try {
+              return decrypt(encryptedPassword);
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined,
+    }));
+  }
 
   const findings = await db
     .select()
@@ -124,7 +143,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           playbookVersion={proj.playbookVersion ?? null}
           scope={proj.scope ?? null}
           applicationUrl={proj.applicationUrl ?? null}
-          testAccounts={proj.testAccounts ?? null}
+          testAccounts={decryptAccounts(proj.testAccounts ?? null)}
           startDate={proj.startDate?.toISOString() ?? null}
           endDate={proj.endDate?.toISOString() ?? null}
           highCount={highCount?.c ?? 0}

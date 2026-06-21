@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { verifyReportVersionAccess } from "@/lib/project-access";
+import { decrypt } from "@/lib/crypto";
 import { generateDocx } from "@/lib/export/word";
 import {
   generateDocxFromTemplate,
@@ -170,7 +171,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     scope: proj.scope ?? null,
     applicationUrl: proj.applicationUrl ?? null,
     reportVersion: reportVersionString,
-    testAccounts: proj.testAccounts ?? null,
+    testAccounts: proj.testAccounts
+      ? proj.testAccounts.map(({ role, username, encryptedPassword }) => ({
+          role,
+          username,
+          ...(encryptedPassword
+            ? {
+                password: (() => {
+                  try {
+                    return decrypt(encryptedPassword);
+                  } catch {
+                    return undefined;
+                  }
+                })(),
+              }
+            : {}),
+        }))
+      : null,
     organizationName: user?.organizationName ?? null,
     startDate: null,
     endDate: null,

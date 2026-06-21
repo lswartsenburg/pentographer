@@ -6,11 +6,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IconPlus, IconX } from "@tabler/icons-react";
+import { IconPlus, IconX, IconEye, IconEyeOff } from "@tabler/icons-react";
 
 interface TestAccount {
   role: string;
   username: string;
+  password?: string;
 }
 
 interface ProjectSidebarProps {
@@ -60,6 +61,15 @@ export function ProjectSidebar({
   const [applicationUrl, setApplicationUrl] = useState(initialApplicationUrl ?? "");
   const [testAccounts, setTestAccounts] = useState<TestAccount[]>(initialTestAccounts ?? []);
   const [saving, setSaving] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<number>>(new Set());
+
+  function togglePasswordVisible(index: number) {
+    setVisiblePasswords((prev) => {
+      const next = new Set(prev);
+      next.has(index) ? next.delete(index) : next.add(index);
+      return next;
+    });
+  }
 
   function addTestAccount() {
     setTestAccounts((prev) => [...prev, { role: "", username: "" }]);
@@ -80,7 +90,13 @@ export function ProjectSidebar({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         applicationUrl: applicationUrl.trim() || null,
-        testAccounts: testAccounts.filter((a) => a.role.trim() || a.username.trim()),
+        testAccounts: testAccounts
+          .filter((a) => a.role.trim() || a.username.trim())
+          .map(({ role, username, password }) => ({
+            role,
+            username,
+            ...(password ? { password } : {}),
+          })),
       }),
     });
     setSaving(false);
@@ -188,25 +204,45 @@ export function ProjectSidebar({
               </button>
             </div>
             {testAccounts.map((acc, i) => (
-              <div key={i} className="flex gap-1 items-center">
-                <Input
-                  value={acc.role}
-                  onChange={(e) => updateTestAccount(i, "role", e.target.value)}
-                  placeholder="Role"
-                  className="h-6 text-[11px] w-20 shrink-0"
-                />
-                <Input
-                  value={acc.username}
-                  onChange={(e) => updateTestAccount(i, "username", e.target.value)}
-                  placeholder="Username"
-                  className="h-6 text-[11px] flex-1 min-w-0"
-                />
-                <button
-                  onClick={() => removeTestAccount(i)}
-                  className="shrink-0 text-muted-foreground hover:text-foreground"
-                >
-                  <IconX size={12} />
-                </button>
+              <div key={i} className="space-y-0.5">
+                <div className="flex gap-1 items-center">
+                  <Input
+                    value={acc.role}
+                    onChange={(e) => updateTestAccount(i, "role", e.target.value)}
+                    placeholder="Role"
+                    className="h-6 text-[11px] w-20 shrink-0"
+                  />
+                  <Input
+                    value={acc.username}
+                    onChange={(e) => updateTestAccount(i, "username", e.target.value)}
+                    placeholder="Username"
+                    className="h-6 text-[11px] flex-1 min-w-0"
+                  />
+                  <button
+                    onClick={() => removeTestAccount(i)}
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                  >
+                    <IconX size={12} />
+                  </button>
+                </div>
+                <div className="flex gap-1 items-center pl-[84px]">
+                  <div className="relative flex-1 min-w-0">
+                    <Input
+                      type={visiblePasswords.has(i) ? "text" : "password"}
+                      value={acc.password ?? ""}
+                      onChange={(e) => updateTestAccount(i, "password", e.target.value)}
+                      placeholder="Password (optional)"
+                      className="h-6 text-[11px] pr-6"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePasswordVisible(i)}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {visiblePasswords.has(i) ? <IconEyeOff size={11} /> : <IconEye size={11} />}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
