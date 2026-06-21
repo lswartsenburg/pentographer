@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pentographer — Security Audit Platform",
+  title: "Pentographer - Security Audit Platform",
   description: "AI-assisted cybersecurity audit reporting platform",
   icons: {
     icon: [
