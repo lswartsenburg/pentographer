@@ -107,6 +107,13 @@ export function ProjectTabs({ projectId, findings, reports, exportHistory }: Pro
   const [newReportOpen, setNewReportOpen] = useState(false);
   const [newReportName, setNewReportName] = useState("");
   const [creatingReport, setCreatingReport] = useState(false);
+  const [newVersionForReport, setNewVersionForReport] = useState<{
+    reportId: string;
+    existingVersions: ReportVersionSummary[];
+  } | null>(null);
+  const [newVersionString, setNewVersionString] = useState("");
+  const [newVersionForkId, setNewVersionForkId] = useState("");
+  const [creatingVersion, setCreatingVersion] = useState(false);
 
   async function handleAiSuggest() {
     setSuggestLoading(true);
@@ -190,6 +197,39 @@ export function ProjectTabs({ projectId, findings, reports, exportHistory }: Pro
     }
   }
 
+  async function handleCreateVersion() {
+    if (!newVersionForReport || !newVersionString.trim()) return;
+    setCreatingVersion(true);
+    try {
+      const body: Record<string, string> = { version: newVersionString.trim() };
+      if (newVersionForkId) body.forkFromVersionId = newVersionForkId;
+      const res = await fetch(
+        `/api/projects/${projectId}/reports/${newVersionForReport.reportId}/versions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
+      if (!res.ok) {
+        toast.error("Failed to create version.");
+        return;
+      }
+      const data = await res.json();
+      setNewVersionForReport(null);
+      setNewVersionString("");
+      setNewVersionForkId("");
+      router.refresh();
+      router.push(
+        `/projects/${projectId}/reports/${newVersionForReport.reportId}/versions/${data.id}`
+      );
+    } catch {
+      toast.error("Failed to create version.");
+    } finally {
+      setCreatingVersion(false);
+    }
+  }
+
   return (
     <Tabs defaultValue="findings" className="flex flex-col flex-1 min-h-0">
       <TabsList className="shrink-0 justify-start rounded-none border-b border-border bg-transparent h-auto px-5 py-0">
@@ -241,6 +281,62 @@ export function ProjectTabs({ projectId, findings, reports, exportHistory }: Pro
                 disabled={creatingReport || !newReportName.trim()}
               >
                 {creatingReport ? <IconLoader2 size={13} className="animate-spin" /> : null}
+                Create
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New version dialog */}
+      <Dialog
+        open={!!newVersionForReport}
+        onOpenChange={(open) => !open && setNewVersionForReport(null)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>New version</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="version-string">Version</Label>
+              <Input
+                id="version-string"
+                placeholder="e.g. 1.1"
+                value={newVersionString}
+                onChange={(e) => setNewVersionString(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateVersion()}
+                autoFocus
+              />
+            </div>
+            {newVersionForReport && newVersionForReport.existingVersions.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="fork-from">Copy content from</Label>
+                <select
+                  id="fork-from"
+                  value={newVersionForkId}
+                  onChange={(e) => setNewVersionForkId(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                >
+                  <option value="">Start blank</option>
+                  {newVersionForReport.existingVersions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      v{v.version} ({VERSION_STATUS_LABEL[v.status]})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setNewVersionForReport(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCreateVersion}
+                disabled={creatingVersion || !newVersionString.trim()}
+              >
+                {creatingVersion ? <IconLoader2 size={13} className="animate-spin" /> : null}
                 Create
               </Button>
             </div>
@@ -376,6 +472,17 @@ export function ProjectTabs({ projectId, findings, reports, exportHistory }: Pro
                       year: "numeric",
                     })}
                   </span>
+                  <button
+                    onClick={() => {
+                      setNewVersionForReport({ reportId: r.id, existingVersions: r.versions });
+                      setNewVersionString("");
+                      setNewVersionForkId("");
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded hover:bg-muted transition-colors"
+                  >
+                    <IconPlus size={11} />
+                    New version
+                  </button>
                 </div>
                 {r.versions.length > 0 && (
                   <div className="divide-y divide-border">
