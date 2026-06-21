@@ -23,18 +23,20 @@ export default defineConfig({
       dependencies: ["setup"],
     },
   ],
-  // In CI the app is pre-built; webServer starts it automatically.
-  // Locally, run `pnpm dev` before `pnpm test:e2e`.
-  ...(process.env.CI
+  // In CI the app is pre-built and the standalone server is started directly.
+  // Locally, Playwright reuses a running dev server or starts one automatically.
+  webServer: process.env.CI
     ? {
-        webServer: {
-          // `next start` doesn't work with output:standalone — use the compiled server directly
-          command: "node .next/standalone/server.js",
-          url: "http://localhost:3000",
-          reuseExistingServer: false,
-          timeout: 60_000,
-          env: { PORT: "3000", HOSTNAME: "0.0.0.0" },
-        },
+        command: "node .next/standalone/server.js",
+        url: "http://localhost:3000",
+        reuseExistingServer: false,
+        timeout: 60_000,
+        env: { PORT: "3000", HOSTNAME: "0.0.0.0" },
       }
-    : {}),
+    : {
+        command: "pnpm dev",
+        url: "http://localhost:3000",
+        reuseExistingServer: true,
+        timeout: 120_000,
+      },
 });
