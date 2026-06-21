@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { del } from "@vercel/blob";
+import { getStorage } from "@/lib/storage";
 import { db } from "@/db/client";
 import { reportTemplate } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
@@ -81,7 +81,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const tmpl = await getOwnedTemplate(session!.user.id, templateId);
   if (!tmpl) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await del(tmpl.blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN });
+  await getStorage().del(tmpl.blobUrl);
   await db.delete(reportTemplate).where(eq(reportTemplate.id, templateId));
 
   return NextResponse.json({ deleted: true });

@@ -28,26 +28,30 @@
 [x] BYOT Word export (template library + marketplace + metadata fields)
 
 [ ] More secure login features
+[ ] Make sure that we can upload multiple files at a time for a finding
 
 [x] Export (Google Docs, PDF, Word) — needs design thought: template customisation, section ordering, branding. Do this last.
 
 # Three deployment tiers (corporations are reluctant to use a cloud version with sensitive pentest data)
 
 ## Stream A — Storage abstraction (enables Docker/self-hosted, do this first)
-[ ] Create lib/storage.ts adapter interface with put/get/del/copy
-[ ] Implement lib/storage/vercel.ts — thin wrapper around @vercel/blob
-[ ] Implement lib/storage/local.ts — reads/writes to STORAGE_PATH; urls are /api/files/<key>
-[ ] Add app/api/files/[...key]/route.ts — serves local files with same auth as existing blob proxy
-[ ] Update 8 API routes to use adapter instead of @vercel/blob directly
-[ ] Update docker-compose.yml — mount named volume for STORAGE_PATH, remove MinIO
+
+[x] Create lib/storage.ts adapter interface with put/get/del/copy
+[x] Implement lib/storage/vercel.ts — thin wrapper around @vercel/blob
+[x] Implement lib/storage/local.ts — reads/writes to STORAGE_PATH; urls are /api/files/<key>
+[x] Add app/api/files/[...key]/route.ts — serves local files with same auth as existing blob proxy
+[x] Update 8 API routes to use adapter instead of @vercel/blob directly
+[x] Update docker-compose.yml — mount named volume for STORAGE_PATH, remove MinIO
 
 ## Stream B — SQLite (enables Electron database)
+
 [ ] Add db/schema.sqlite.ts — mirrors db/schema.ts using sqliteTable (enums→text, uuid→text, timestamps→integer, json→text mode)
 [ ] Update db/client.ts — pick driver by DATABASE_URL prefix (file: → SQLite, else → PostgreSQL)
 [ ] Add drizzle.sqlite.config.ts — separate config for SQLite migration generation
 [ ] Generate db/migrations/sqlite/ from the SQLite schema
 
 ## Stream C — Electron shell (Mode 1 — fully offline)
+
 [ ] Set up electron-forge in electron/ directory
 [ ] Write electron/main.ts — spawns Next.js standalone server, sets env vars from userData, runs migrations on first launch
 [ ] Add keytar for OS keychain storage of Anthropic API key

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and, sql } from "drizzle-orm";
-import { copy } from "@vercel/blob";
+import { getStorage } from "@/lib/storage";
 import { db } from "@/db/client";
 import { reportTemplate } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
@@ -25,10 +25,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const safeName = original.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const toPathname = `templates/${session!.user.id}/${Date.now()}-${safeName}`;
 
-  const blob = await copy(original.blobUrl, toPathname, {
-    access: "private",
-    token: process.env.BLOB_READ_WRITE_TOKEN,
-  });
+  const blob = await getStorage().copy(original.blobUrl, toPathname);
 
   const [newRow] = await db
     .insert(reportTemplate)

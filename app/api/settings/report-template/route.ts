@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, desc } from "drizzle-orm";
-import { put } from "@vercel/blob";
+import { getStorage } from "@/lib/storage";
 import { db } from "@/db/client";
 import { reportTemplate } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
@@ -53,10 +53,7 @@ export async function POST(request: NextRequest) {
 
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const blobKey = `templates/${session!.user.id}/${Date.now()}-${safeName}`;
-  const blob = await put(blobKey, file, {
-    access: "private",
-    token: process.env.BLOB_READ_WRITE_TOKEN,
-  });
+  const blob = await getStorage().put(blobKey, Buffer.from(await file.arrayBuffer()), file.type);
 
   const [row] = await db
     .insert(reportTemplate)
