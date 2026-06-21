@@ -82,7 +82,7 @@ export function ReportVersionEditor({
     suggestions: string[];
   } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"docx" | "pdf">("docx");
+  const [exportFormat, setExportFormat] = useState<"docx" | "pdf" | "markdown">("docx");
   const [exportTemplateId, setExportTemplateId] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
@@ -294,17 +294,23 @@ export function ReportVersionEditor({
             <div className="space-y-1.5">
               <Label>Format</Label>
               <div className="flex gap-2">
-                {(["docx", "pdf"] as const).map((f) => (
+                {(
+                  [
+                    { value: "docx", label: "DOCX" },
+                    { value: "pdf", label: "PDF" },
+                    { value: "markdown", label: "Markdown" },
+                  ] as const
+                ).map(({ value, label }) => (
                   <button
-                    key={f}
-                    onClick={() => setExportFormat(f)}
+                    key={value}
+                    onClick={() => setExportFormat(value)}
                     className={`flex-1 py-2 rounded-md border text-sm font-medium transition-colors ${
-                      exportFormat === f
+                      exportFormat === value
                         ? "border-primary bg-primary/5 text-primary"
                         : "border-border text-muted-foreground hover:border-border/80"
                     }`}
                   >
-                    {f.toUpperCase()}
+                    {label}
                   </button>
                 ))}
               </div>

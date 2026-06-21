@@ -23,10 +23,11 @@ import {
   type ExportData,
 } from "@/lib/export/word-template";
 import { generatePdf } from "@/lib/export/pdf";
+import { generateMarkdownZip } from "@/lib/export/markdown";
 import { getStorage } from "@/lib/storage";
 
 const exportSchema = z.object({
-  format: z.enum(["docx", "pdf"]),
+  format: z.enum(["docx", "pdf", "markdown"]),
   templateId: z.string().uuid().optional(),
   reportVersionId: z.string().uuid().optional(),
 });
@@ -207,7 +208,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
 
   const format = parsed.data.format;
-  const filename = `${proj.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_report.${format}`;
+  const slug = proj.name.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  const ext = format === "markdown" ? "zip" : format;
+  const filename = `${slug}_report.${ext}`;
 
   if (format === "docx") {
     const docxHeaders = {
@@ -249,10 +252,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return new NextResponse(buffer as unknown as BodyInit, { headers: docxHeaders });
   }
 
-  const buffer = await generatePdf(exportData);
+  if (format === "pdf") {
+    const buffer = await generatePdf(exportData);
+    return new NextResponse(buffer as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  }
+
+  // markdown zip
+  const buffer = await generateMarkdownZip(exportData);
   return new NextResponse(buffer as unknown as BodyInit, {
     headers: {
-      "Content-Type": "application/pdf",
+      "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
