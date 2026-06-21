@@ -20,14 +20,37 @@
 [x] Identify core features for the tool that have a potential to regress. Lets implement e2e tests for them
 [x] Items in the playbook should have unique URLs
 [x] Suggest new sections in the left sidebar that group things logically together
-[ ] Add hover message to disabled buttons
+[x] Add hover message to disabled buttons
 [ ] Search reports and findings
-[ ] Write README.md
-[ ] Write CONTRIBUTING.md
+[x] Write README.md
+[x] Write CONTRIBUTING.md
 
 [x] BYOT Word export (template library + marketplace + metadata fields)
 
 [ ] More secure login features
-[ ] Electron app version without login
 
 [x] Export (Google Docs, PDF, Word) — needs design thought: template customisation, section ordering, branding. Do this last.
+
+# Three deployment tiers (corporations are reluctant to use a cloud version with sensitive pentest data)
+
+## Stream A — Storage abstraction (enables Docker/self-hosted, do this first)
+[ ] Create lib/storage.ts adapter interface with put/get/del/copy
+[ ] Implement lib/storage/vercel.ts — thin wrapper around @vercel/blob
+[ ] Implement lib/storage/local.ts — reads/writes to STORAGE_PATH; urls are /api/files/<key>
+[ ] Add app/api/files/[...key]/route.ts — serves local files with same auth as existing blob proxy
+[ ] Update 8 API routes to use adapter instead of @vercel/blob directly
+[ ] Update docker-compose.yml — mount named volume for STORAGE_PATH, remove MinIO
+
+## Stream B — SQLite (enables Electron database)
+[ ] Add db/schema.sqlite.ts — mirrors db/schema.ts using sqliteTable (enums→text, uuid→text, timestamps→integer, json→text mode)
+[ ] Update db/client.ts — pick driver by DATABASE_URL prefix (file: → SQLite, else → PostgreSQL)
+[ ] Add drizzle.sqlite.config.ts — separate config for SQLite migration generation
+[ ] Generate db/migrations/sqlite/ from the SQLite schema
+
+## Stream C — Electron shell (Mode 1 — fully offline)
+[ ] Set up electron-forge in electron/ directory
+[ ] Write electron/main.ts — spawns Next.js standalone server, sets env vars from userData, runs migrations on first launch
+[ ] Add keytar for OS keychain storage of Anthropic API key
+[ ] Add Settings → AI page for entering/removing the API key
+[ ] Add pnpm electron:build script (next build → copy standalone → electron-forge make → DMG/EXE/AppImage)
+[ ] Hide template marketplace in Electron builds (ELECTRON=true)
