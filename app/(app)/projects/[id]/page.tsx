@@ -11,6 +11,7 @@ import {
   report,
   reportVersion,
   auditLog,
+  userAccount,
 } from "@/db/schema";
 import { eq, and, desc, count } from "drizzle-orm";
 import { ProjectTabs } from "./project-tabs";
@@ -105,9 +106,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     })
   );
 
-  const exportHistory = await db
-    .select()
+  const rawExportHistory = await db
+    .select({
+      id: auditLog.id,
+      action: auditLog.action,
+      createdAt: auditLog.createdAt,
+      metadata: auditLog.metadata,
+      exporterName: userAccount.name,
+    })
     .from(auditLog)
+    .leftJoin(userAccount, eq(auditLog.userId, userAccount.id))
     .where(
       and(
         eq(auditLog.resourceType, "project"),
@@ -117,6 +125,29 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     )
     .orderBy(desc(auditLog.createdAt))
     .limit(20);
+
+  // Build a flat map of versionId → { reportName, version } for quick lookup
+  const versionIndex = new Map<string, { reportName: string; version: string }>();
+  for (const r of reportsWithVersions) {
+    for (const v of r.versions) {
+      versionIndex.set(v.id, { reportName: r.name, version: v.version });
+    }
+  }
+
+  const exportHistory = rawExportHistory.map((e) => {
+    const meta = e.metadata as Record<string, string> | null;
+    const rvId = meta?.reportVersionId ?? null;
+    const reportInfo = rvId ? (versionIndex.get(rvId) ?? null) : null;
+    return {
+      id: e.id,
+      action: e.action,
+      createdAt: e.createdAt.toISOString(),
+      format: meta?.format ?? null,
+      exporterName: e.exporterName ?? null,
+      reportName: reportInfo?.reportName ?? null,
+      reportVersion: reportInfo?.version ?? null,
+    };
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -174,12 +205,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 createdAt: v.createdAt.toISOString(),
               })),
             }))}
-            exportHistory={exportHistory.map((e) => ({
-              id: e.id,
-              action: e.action,
-              createdAt: e.createdAt.toISOString(),
-              metadata: e.metadata as Record<string, unknown> | null,
-            }))}
+            exportHistory={exportHistory}
           />
         </div>
       </div>

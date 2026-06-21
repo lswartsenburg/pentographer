@@ -35,7 +35,7 @@
 - [x] How does a user actually create an export from a report? How do they select a template?
 - [ ] Should we store the full credentials for accounts? Or make it optional? I see some security concerns
 - [ ] Build a markdown export. The export should create a zip that contains the markdown, and images
-- [ ] Export history should include more details. Like, who exported the document?
+- [ ] Export history should include more details. Like, who exported the document? Which report was it?
 
 # Three deployment tiers (corporations are reluctant to use a cloud version with sensitive pentest data)
 

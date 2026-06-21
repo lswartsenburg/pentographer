@@ -80,7 +80,10 @@ interface ProjectTabsProps {
     id: string;
     action: string;
     createdAt: string;
-    metadata: Record<string, unknown> | null;
+    format: string | null;
+    exporterName: string | null;
+    reportName: string | null;
+    reportVersion: string | null;
   }>;
 }
 
@@ -534,14 +537,37 @@ export function ProjectTabs({ projectId, findings, reports, exportHistory }: Pro
             {exportHistory.map((e) => (
               <div
                 key={e.id}
-                className="flex items-center gap-3 bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm"
+                className="bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm flex items-start gap-3"
               >
-                <span className="text-foreground font-medium capitalize">
-                  {(e.metadata as Record<string, string> | null)?.format ?? "Export"}
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  {new Date(e.createdAt).toLocaleString()}
-                </span>
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium uppercase text-xs tracking-wide text-foreground">
+                      {e.format ?? "export"}
+                    </span>
+                    {e.reportName && (
+                      <>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-xs text-foreground truncate">
+                          {e.reportName}
+                          {e.reportVersion ? ` v${e.reportVersion}` : ""}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                    {e.exporterName && <span>{e.exporterName}</span>}
+                    {e.exporterName && <span>·</span>}
+                    <span>
+                      {new Date(e.createdAt).toLocaleString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
