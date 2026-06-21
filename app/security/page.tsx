@@ -33,10 +33,10 @@ export default function SecurityPage() {
           <p className="text-sm text-muted-foreground">
             Email your findings to{" "}
             <a
-              href="mailto:security@pentographer.app"
+              href="mailto:security@pentographer.com"
               className="text-foreground underline underline-offset-2"
             >
-              security@pentographer.app
+              security@pentographer.com
             </a>
             . Please do not open a public GitHub issue for security vulnerabilities.
           </p>
@@ -72,7 +72,7 @@ export default function SecurityPage() {
           <h2 className="text-base font-semibold">Scope</h2>
           <p className="text-sm text-muted-foreground">
             In scope: the Pentographer web application and its APIs (
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">pentographer.app</code> and
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">pentographer.com</code> and
             subdomains).
           </p>
           <p className="text-sm text-muted-foreground">
