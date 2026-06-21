@@ -30,7 +30,11 @@ export async function GET() {
   const withVersions = await Promise.all(
     rows.map(async (pb) => {
       const [latest] = await db
-        .select({ version: playbookVersion.version, id: playbookVersion.id })
+        .select({
+          version: playbookVersion.version,
+          id: playbookVersion.id,
+          status: playbookVersion.status,
+        })
         .from(playbookVersion)
         .where(eq(playbookVersion.playbookId, pb.id))
         .orderBy(desc(playbookVersion.createdAt))

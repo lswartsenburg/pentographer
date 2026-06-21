@@ -1,9 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and, desc } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db/client";
 import { project, finding, findingVersion, playbookItem, playbookCategory } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
+import { aiErrorMessage } from "@/lib/ai/error";
+import type Anthropic from "@anthropic-ai/sdk";
+
+const bodySchema = z.object({
+  instruction: z.string().max(2000).optional(),
+});
+
+const DRAFT_TOOL: Anthropic.Tool = {
+  name: "write_finding",
+  description: "Write a professional penetration test finding with description and remediation.",
+  input_schema: {
+    type: "object" as const,
+    required: ["description", "remediation"],
+    properties: {
+      description: {
+        type: "string",
+        description:
+          "Clear technical description of the vulnerability: what it is, where it was found, how it can be exploited, and the business/security impact. Use markdown formatting. 3-5 paragraphs. If evidence images are provided, reference them explicitly (e.g. 'As shown in fig-1, ...').",
+      },
+      remediation: {
+        type: "string",
+        description:
+          "Concrete, actionable remediation steps the development team can follow. Use numbered or bulleted lists. Include code examples where helpful.",
+      },
+    },
+  },
+};
+
+const VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
+type ValidImageType = (typeof VALID_IMAGE_TYPES)[number];
+
+async function fetchImageBlock(
+  url: string,
+  token: string
+): Promise<Anthropic.Base64ImageSource | null> {
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return null;
+    const rawType = (res.headers.get("content-type") ?? "").split(";")[0].trim();
+    if (!(VALID_IMAGE_TYPES as readonly string[]).includes(rawType)) return null;
+    const buffer = await res.arrayBuffer();
+    return {
+      type: "base64",
+      media_type: rawType as ValidImageType,
+      data: Buffer.from(buffer).toString("base64"),
+    };
+  } catch {
+    return null;
+  }
+}
 
 async function getOwnedFinding(userId: string, projectId: string, findingId: string) {
   const [proj] = await db
@@ -24,7 +75,7 @@ async function getOwnedFinding(userId: string, projectId: string, findingId: str
 }
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string; findingId: string }> }
 ) {
   const { session, error } = await requireAuth();
@@ -39,6 +90,15 @@ export async function POST(
   const result = await getOwnedFinding(session!.user.id, projectId, findingId);
   if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const { finding: f, projectName } = result;
+
+  let instruction: string | undefined;
+  try {
+    const raw = await req.json().catch(() => ({}));
+    const parsed = bodySchema.safeParse(raw);
+    if (parsed.success) instruction = parsed.data.instruction;
+  } catch {
+    // no body — fine
+  }
 
   const [latestVersion] = await db
     .select()
@@ -67,47 +127,82 @@ export async function POST(
     }
   }
 
-  const prompt = `You are a senior penetration tester writing a professional security audit finding report.
+  // Build evidence image blocks (up to 4 images to stay within token limits)
+  const evidenceItems: { key: string; url: string }[] = Array.isArray(latestVersion?.evidenceUrls)
+    ? (latestVersion.evidenceUrls as { key: string; url: string }[]).slice(0, 4)
+    : [];
+
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN ?? "";
+  const imageBlocks: Anthropic.ImageBlockParam[] = [];
+  const imageKeys: string[] = [];
+
+  for (const item of evidenceItems) {
+    if (!item.url) continue;
+    const src = await fetchImageBlock(item.url, blobToken);
+    if (!src) continue;
+    imageBlocks.push({ type: "image", source: src });
+    imageKeys.push(item.key);
+  }
+
+  // Build the text prompt
+  const hasExisting = !!(latestVersion?.description || latestVersion?.remediation);
+  const hasImages = imageBlocks.length > 0;
+
+  let prompt = `You are a senior penetration tester writing a professional security audit finding report.
 
 Project: ${projectName}
 Finding title: ${f.title}
-Risk level: ${f.riskLevel}${playbookContext}
+Risk level: ${f.riskLevel}${playbookContext}`;
 
-Write a professional security finding. Return a JSON object with exactly two keys:
-- "description": A clear, technical description of the vulnerability. What it is, where it was found, how it can be exploited, and the business/security impact. Use markdown formatting. 3-5 paragraphs.
-- "remediation": Concrete, actionable remediation steps the development team can follow. Use numbered or bulleted lists. Include code examples where helpful.
+  if (hasExisting) {
+    prompt += `\n\nExisting description (revise and improve this):\n${latestVersion!.description || "(empty)"}`;
+    prompt += `\n\nExisting remediation (revise and improve this):\n${latestVersion!.remediation || "(empty)"}`;
+  }
 
-Respond with ONLY the JSON object. No preamble or explanation.`;
+  if (hasImages) {
+    prompt += `\n\nEvidence (${imageBlocks.length} image${imageBlocks.length > 1 ? "s" : ""} attached above, labelled ${imageKeys.join(", ")}): your description must reference these images explicitly and explain what each one demonstrates about the vulnerability.`;
+  }
+
+  if (instruction) {
+    prompt += `\n\nAdditional instructions from the tester: ${instruction}`;
+  }
+
+  prompt += `\n\nWrite a professional security finding suitable for inclusion in a penetration test report.`;
+
+  const userContent: Anthropic.MessageParam["content"] = [
+    ...imageBlocks,
+    { type: "text", text: prompt },
+  ];
 
   try {
     const message = await client.messages.create({
       model: AI_MODEL,
       max_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
+      tools: [DRAFT_TOOL],
+      tool_choice: { type: "tool", name: "write_finding" },
+      messages: [{ role: "user", content: userContent }],
     });
 
-    const raw = message.content[0]?.type === "text" ? message.content[0].text : "";
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    const cleaned = start !== -1 && end > start ? raw.slice(start, end + 1) : raw.trim();
-
-    let parsed: { description: string; remediation: string };
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch {
-      return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
+    const block = message.content.find((b) => b.type === "tool_use");
+    if (!block || block.type !== "tool_use") {
+      return NextResponse.json(
+        { error: "AI returned an unexpected response format. Please try again." },
+        { status: 500 }
+      );
     }
 
-    const description = parsed.description?.trim() ?? "";
-    const remediation = parsed.remediation?.trim() ?? "";
+    const { description, remediation } = block.input as {
+      description: string;
+      remediation: string;
+    };
 
     const [newVersion] = await db
       .insert(findingVersion)
       .values({
         findingId,
         title: f.title,
-        description: description || null,
-        remediation: remediation || null,
+        description: description?.trim() || null,
+        remediation: remediation?.trim() || null,
         riskLevel: f.riskLevel,
         cvssScore: latestVersion?.cvssScore ?? null,
         status: latestVersion?.status ?? f.status,
@@ -116,8 +211,12 @@ Respond with ONLY the JSON object. No preamble or explanation.`;
       })
       .returning({ id: findingVersion.id });
 
-    return NextResponse.json({ description, remediation, versionId: newVersion.id });
+    return NextResponse.json({
+      description: description?.trim() ?? "",
+      remediation: remediation?.trim() ?? "",
+      versionId: newVersion.id,
+    });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 500 });
   }
 }

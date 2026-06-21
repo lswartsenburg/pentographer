@@ -71,6 +71,7 @@ export const playbookVersion = pgTable("playbook_version", {
   version: text("version").notNull(),
   changelog: text("changelog"),
   isActive: boolean("is_active").notNull().default(true),
+  status: text("status").notNull().default("draft"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

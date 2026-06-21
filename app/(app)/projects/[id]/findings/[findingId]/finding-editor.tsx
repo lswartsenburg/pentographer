@@ -21,7 +21,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import {
   IconDeviceFloppy,
@@ -136,24 +138,33 @@ export function FindingEditor({
   const [linkingItem, setLinkingItem] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<string | null>(f.playbookItemId ?? null);
   const [aiLoading, setAiLoading] = useState<"draft" | "review" | null>(null);
+  const [aiDraftOpen, setAiDraftOpen] = useState(false);
+  const [draftInstruction, setDraftInstruction] = useState("");
   const [aiReview, setAiReview] = useState<{
     completeness: string;
     severity: string;
     suggestions: string[];
   } | null>(null);
-  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>(
-    latestVersion?.evidenceUrls ?? []
+  // Normalize legacy evidence items that may be plain strings instead of {key,url} objects
+  const normalizedEvidence: EvidenceItem[] = (latestVersion?.evidenceUrls ?? []).map(
+    (e: unknown, i: number) => {
+      if (typeof e === "string") return { key: `fig-${i + 1}`, url: e };
+      const obj = e as Partial<EvidenceItem>;
+      return { key: obj.key ?? `fig-${i + 1}`, url: obj.url ?? "" };
+    }
   );
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>(normalizedEvidence);
   const nextKeyNum = useRef(
     Math.max(
       0,
-      ...(latestVersion?.evidenceUrls ?? []).map((e) => {
+      ...normalizedEvidence.map((e) => {
         const m = e.key.match(/fig-(\d+)/);
         return m ? parseInt(m[1]) : 0;
       })
     ) + 1
   );
   const [uploading, setUploading] = useState(false);
+  const [evidenceDragOver, setEvidenceDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentItem = playbookItems.find((i) => i.id === currentItemId) ?? null;
@@ -232,10 +243,13 @@ export function FindingEditor({
   }
 
   async function handleAiDraft() {
+    setAiDraftOpen(false);
     setAiLoading("draft");
     try {
       const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/ai/draft`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instruction: draftInstruction.trim() || undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -248,6 +262,7 @@ export function FindingEditor({
       }
       setDescription(data.description ?? "");
       setRemediation(data.remediation ?? "");
+      setDraftInstruction("");
       toast.success("AI draft complete. Review and save when ready.");
       router.refresh();
     } catch {
@@ -265,7 +280,13 @@ export function FindingEditor({
       const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/ai/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, remediation, riskLevel }),
+        body: JSON.stringify({
+          title,
+          description,
+          remediation,
+          riskLevel,
+          evidenceUrls: evidenceItems,
+        }),
       });
 
       if (!res.ok) {
@@ -287,16 +308,10 @@ export function FindingEditor({
     }
   }
 
-  async function handleEvidenceUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!fileInputRef.current) return;
-    fileInputRef.current.value = "";
-    if (!file) return;
-
+  async function uploadEvidenceFile(file: File) {
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-
     try {
       const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/evidence`, {
         method: "POST",
@@ -314,6 +329,19 @@ export function FindingEditor({
     } finally {
       setUploading(false);
     }
+  }
+
+  function handleEvidenceUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (file) uploadEvidenceFile(file);
+  }
+
+  function handleEvidenceDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setEvidenceDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadEvidenceFile(file);
   }
 
   async function handleEvidenceDelete(url: string) {
@@ -463,13 +491,37 @@ export function FindingEditor({
             </div>
             {evidenceItems.length === 0 ? (
               <div
-                className="border border-dashed border-border rounded-lg px-4 py-5 text-center text-xs text-muted-foreground cursor-pointer hover:border-border/60 transition-colors"
+                className={`border border-dashed rounded-lg px-4 py-5 text-center text-xs text-muted-foreground cursor-pointer transition-colors ${evidenceDragOver ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-border/60"}`}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setEvidenceDragOver(true);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setEvidenceDragOver(true);
+                }}
+                onDragLeave={() => setEvidenceDragOver(false)}
+                onDrop={handleEvidenceDrop}
               >
-                No evidence attached. Click to upload an image or PDF (max 10 MB).
+                {evidenceDragOver
+                  ? "Drop to upload"
+                  : "No evidence attached. Click or drop an image or PDF (max 10 MB)."}
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div
+                className={`flex flex-wrap gap-2 rounded-lg border border-dashed p-2 transition-colors ${evidenceDragOver ? "border-primary bg-primary/5" : "border-transparent"}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setEvidenceDragOver(true);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setEvidenceDragOver(true);
+                }}
+                onDragLeave={() => setEvidenceDragOver(false)}
+                onDrop={handleEvidenceDrop}
+              >
                 {evidenceItems.map(({ key, url }) => {
                   const isImage = /\.(jpe?g|png|gif|webp|svg)(\?|$)/i.test(url);
                   const proxyUrl = `/api/projects/${projectId}/findings/${f.id}/evidence/proxy?url=${encodeURIComponent(url)}`;
@@ -624,20 +676,57 @@ export function FindingEditor({
             <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wide font-medium">
               AI tools
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAiDraft}
-              disabled={aiLoading !== null}
-              className="w-full justify-start text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#E4E2FD] text-xs"
-            >
-              {aiLoading === "draft" ? (
-                <IconLoader2 size={12} className="animate-spin" />
-              ) : (
-                <IconSparkles size={12} />
-              )}
-              Draft finding
-            </Button>
+            <Dialog open={aiDraftOpen} onOpenChange={setAiDraftOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={aiLoading !== null}
+                  className="w-full justify-start text-[#3C3489] border-[#AFA9EC] bg-[#EEEDFE] hover:bg-[#E4E2FD] text-xs"
+                >
+                  {aiLoading === "draft" ? (
+                    <IconLoader2 size={12} className="animate-spin" />
+                  ) : (
+                    <IconSparkles size={12} />
+                  )}
+                  Draft finding
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Draft finding with AI</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 py-1">
+                  <p className="text-xs text-muted-foreground">
+                    AI will use the finding title, risk level, linked playbook item
+                    {evidenceItems.length > 0
+                      ? `, and ${evidenceItems.length} attached evidence image${evidenceItems.length > 1 ? "s" : ""}`
+                      : ""}
+                    {description || remediation ? ", and your existing draft" : ""} to write a
+                    professional finding.
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Instructions (optional)</Label>
+                    <Textarea
+                      rows={3}
+                      className="text-xs resize-none"
+                      placeholder="e.g. Focus on the business impact, highlight the authentication bypass angle, write in a more formal tone…"
+                      value={draftInstruction}
+                      onChange={(e) => setDraftInstruction(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" size="sm" onClick={() => setAiDraftOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={handleAiDraft}>
+                    <IconSparkles size={12} />
+                    Generate
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Button
               variant="outline"
               size="sm"

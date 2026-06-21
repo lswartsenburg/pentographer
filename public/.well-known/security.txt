@@ -1,0 +1,4 @@
+Contact: mailto:security@pentographer.com
+Expires: 2027-06-21T00:00:00.000Z
+Policy: https://pentographer.com/security
+Preferred-Languages: en

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DisabledTooltip } from "@/components/ui/disabled-tooltip";
 import { PlaybookItemCombobox } from "@/components/playbook-item-combobox";
 import { IconSparkles } from "@tabler/icons-react";
 import type { PlaybookItemOption } from "./page";
@@ -143,9 +144,11 @@ export function NewFindingForm({ projectId, playbookItems }: NewFindingFormProps
               Cancel
             </Button>
           </Link>
-          <Button type="submit" disabled={loading || !title.trim()}>
-            {loading ? "Creating…" : "Create finding"}
-          </Button>
+          <DisabledTooltip label="Enter a finding title to continue">
+            <Button type="submit" disabled={loading || !title.trim()}>
+              {loading ? "Creating…" : "Create finding"}
+            </Button>
+          </DisabledTooltip>
         </div>
       </form>
     </div>
