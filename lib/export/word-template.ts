@@ -1,6 +1,9 @@
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ImageModule = require("docxtemplater-image-module-free");
+
 export class TemplateRenderError extends Error {
   constructor(message: string) {
     super(message);
@@ -10,6 +13,11 @@ export class TemplateRenderError extends Error {
 
 type RiskLevel = "high" | "medium" | "low" | "informational";
 
+interface EvidenceImageItem {
+  image: Buffer;
+  caption: string;
+}
+
 interface ExportFinding {
   title: string;
   riskLevel: RiskLevel;
@@ -18,12 +26,22 @@ interface ExportFinding {
   description: string | null;
   remediation: string | null;
   evidenceUrls: Array<{ key: string; url: string }>;
+  evidenceImages?: EvidenceImageItem[];
 }
 
-interface ExportData {
+interface TestAccount {
+  role: string;
+  username: string;
+}
+
+export interface ExportData {
   projectName: string;
   customerName: string;
   scope: string | null;
+  applicationUrl: string | null;
+  reportVersion: string | null;
+  testAccounts: TestAccount[] | null;
+  organizationName: string | null;
   startDate: string | null;
   endDate: string | null;
   execSummary: string | null;
@@ -62,22 +80,30 @@ export function generateDocxFromTemplate(templateBuffer: Buffer, data: ExportDat
   const lowCount = data.findings.filter((f) => f.riskLevel === "low").length;
   const infoCount = data.findings.filter((f) => f.riskLevel === "informational").length;
 
+  const now = new Date();
+
   const templateData = {
     projectName: data.projectName,
     customerName: data.customerName,
+    organizationName: data.organizationName ?? "",
     scope: data.scope ?? "",
+    applicationUrl: data.applicationUrl ?? "",
+    reportVersion: data.reportVersion ?? "1.0",
+    testAccounts: data.testAccounts ?? [],
     execSummary: stripMarkdown(data.execSummary),
-    exportDate: new Date().toLocaleDateString("en-GB", {
+    exportDate: now.toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "long",
       year: "numeric",
     }),
+    monthYear: now.toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
     totalFindings: data.findings.length,
     highCount,
     mediumCount,
     lowCount,
     infoCount,
-    findings: sortedFindings.map((f) => ({
+    findings: sortedFindings.map((f, idx) => ({
+      number: idx + 1,
       title: f.title,
       riskLevel: f.riskLevel,
       riskLevelLabel: riskLevelLabel(f.riskLevel),
@@ -87,14 +113,28 @@ export function generateDocxFromTemplate(templateBuffer: Buffer, data: ExportDat
       description: stripMarkdown(f.description),
       remediation: stripMarkdown(f.remediation),
       evidenceText: f.evidenceUrls.map(({ key, url }) => `[${key}] ${url}`).join("\n"),
+      evidenceImages: f.evidenceImages ?? [],
     })),
   };
+
+  const imageModule = new ImageModule({
+    centered: false,
+    fileType: "docx",
+    getImage(tagValue: unknown) {
+      if (Buffer.isBuffer(tagValue)) return tagValue;
+      return null;
+    },
+    getSize(_img: unknown, tagValue: unknown) {
+      return tagValue ? [600, 450] : [0, 0];
+    },
+  });
 
   const zip = new PizZip(templateBuffer);
 
   let doc: Docxtemplater;
   try {
     doc = new Docxtemplater(zip, {
+      modules: [imageModule],
       paragraphLoop: true,
       linebreaks: true,
     });

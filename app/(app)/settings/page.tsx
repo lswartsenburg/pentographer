@@ -10,7 +10,12 @@ export default async function SettingsPage() {
   if (!session?.user?.id) redirect("/login");
 
   const [user] = await db
-    .select({ id: userAccount.id, name: userAccount.name, email: userAccount.email })
+    .select({
+      id: userAccount.id,
+      name: userAccount.name,
+      email: userAccount.email,
+      organizationName: userAccount.organizationName,
+    })
     .from(userAccount)
     .where(eq(userAccount.id, session.user.id))
     .limit(1);

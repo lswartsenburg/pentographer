@@ -65,6 +65,7 @@ export default function NewProjectPage() {
         customerId: form.get("customerId"),
         playbookVersionId: form.get("playbookVersionId") || null,
         scope: form.get("scope") || null,
+        applicationUrl: form.get("applicationUrl") || null,
         startDate: form.get("startDate")
           ? new Date(form.get("startDate") as string).toISOString()
           : null,
@@ -156,6 +157,19 @@ export default function NewProjectPage() {
                 name="scope"
                 placeholder="app.acmecorp.com — authenticated + unauthenticated"
                 rows={2}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="applicationUrl">
+                Application URL{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                id="applicationUrl"
+                name="applicationUrl"
+                type="url"
+                placeholder="https://app.acmecorp.com"
               />
             </div>
 

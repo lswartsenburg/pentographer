@@ -5,11 +5,16 @@ import { db } from "@/db/client";
 import { project, customer, playbookVersion } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 
+const testAccountSchema = z.object({ role: z.string().max(100), username: z.string().max(200) });
+
 const createSchema = z.object({
   name: z.string().min(1).max(300),
   customerId: z.string().uuid(),
   playbookVersionId: z.string().uuid().optional().nullable(),
   scope: z.string().max(2000).optional().nullable(),
+  applicationUrl: z.string().url().max(2000).optional().nullable(),
+  reportVersion: z.string().max(50).optional().nullable(),
+  testAccounts: z.array(testAccountSchema).optional().nullable(),
   startDate: z.string().datetime({ offset: true }).optional().nullable(),
   endDate: z.string().datetime({ offset: true }).optional().nullable(),
 });
@@ -76,6 +81,9 @@ export async function POST(request: NextRequest) {
       playbookVersionId: parsed.data.playbookVersionId ?? null,
       name: parsed.data.name.trim(),
       scope: parsed.data.scope ?? null,
+      applicationUrl: parsed.data.applicationUrl ?? null,
+      reportVersion: parsed.data.reportVersion ?? null,
+      testAccounts: parsed.data.testAccounts ?? null,
       startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
       endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
     })

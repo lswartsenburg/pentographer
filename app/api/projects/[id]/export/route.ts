@@ -10,10 +10,15 @@ import {
   executiveSummaryVersion,
   auditLog,
   reportTemplate,
+  userAccount,
 } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { generateDocx } from "@/lib/export/word";
-import { generateDocxFromTemplate, TemplateRenderError } from "@/lib/export/word-template";
+import {
+  generateDocxFromTemplate,
+  TemplateRenderError,
+  type ExportData,
+} from "@/lib/export/word-template";
 import { generatePdf } from "@/lib/export/pdf";
 import { getStorage } from "@/lib/storage";
 
@@ -21,6 +26,8 @@ const exportSchema = z.object({
   format: z.enum(["docx", "pdf"]),
   templateId: z.string().uuid().optional(),
 });
+
+const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
@@ -32,6 +39,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       id: project.id,
       name: project.name,
       scope: project.scope,
+      applicationUrl: project.applicationUrl,
+      reportVersion: project.reportVersion,
+      testAccounts: project.testAccounts,
       customerName: customer.name,
     })
     .from(project)
@@ -40,6 +50,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .limit(1);
 
   if (!proj) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const [user] = await db
+    .select({ organizationName: userAccount.organizationName })
+    .from(userAccount)
+    .where(eq(userAccount.id, session!.user.id))
+    .limit(1);
 
   let body: unknown;
   try {
@@ -53,8 +69,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  // Load latest version of each finding
+  // Load latest version of each finding, fetching image buffers for DOCX template export
   const findings = await db.select().from(finding).where(eq(finding.projectId, projectId));
+
+  const isTemplateExport = parsed.data.format === "docx" && !!parsed.data.templateId;
 
   const findingsWithVersions = await Promise.all(
     findings.map(async (f) => {
@@ -65,6 +83,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .orderBy(desc(findingVersion.createdAt))
         .limit(1);
 
+      const evidenceUrls = latest?.evidenceUrls ?? [];
+
+      let evidenceImages: Array<{ image: Buffer; caption: string }> | undefined;
+      if (isTemplateExport && evidenceUrls.length > 0) {
+        const settled = await Promise.allSettled(
+          evidenceUrls.map(async ({ key, url }) => {
+            const result = await getStorage().get(url);
+            if (!IMAGE_MIME_TYPES.has(result.contentType)) return null;
+            return { image: result.body, caption: key };
+          })
+        );
+        evidenceImages = settled
+          .filter(
+            (r): r is PromiseFulfilledResult<{ image: Buffer; caption: string }> =>
+              r.status === "fulfilled" && r.value !== null
+          )
+          .map((r) => r.value);
+      }
+
       return {
         title: f.title,
         riskLevel: f.riskLevel,
@@ -72,7 +109,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         status: f.status,
         description: latest?.description ?? null,
         remediation: latest?.remediation ?? null,
-        evidenceUrls: latest?.evidenceUrls ?? [],
+        evidenceUrls,
+        evidenceImages,
       };
     })
   );
@@ -84,10 +122,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .orderBy(desc(executiveSummaryVersion.createdAt))
     .limit(1);
 
-  const exportData = {
+  const exportData: ExportData = {
     projectName: proj.name,
     customerName: proj.customerName ?? "—",
-    scope: proj.scope,
+    scope: proj.scope ?? null,
+    applicationUrl: proj.applicationUrl ?? null,
+    reportVersion: proj.reportVersion ?? null,
+    testAccounts: proj.testAccounts ?? null,
+    organizationName: user?.organizationName ?? null,
     startDate: null,
     endDate: null,
     execSummary: execSummaryRow?.content ?? null,

@@ -46,6 +46,7 @@ export const userAccount = pgTable("user_account", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  organizationName: text("organization_name"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -104,6 +105,8 @@ export const playbookItem = pgTable("playbook_item", {
   displayOrder: integer("display_order").notNull().default(0),
 });
 
+export type TestAccount = { role: string; username: string };
+
 export const project = pgTable("project", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -118,6 +121,9 @@ export const project = pgTable("project", {
   name: text("name").notNull(),
   status: projectStatusEnum("status").notNull().default("in_progress"),
   scope: text("scope"),
+  applicationUrl: text("application_url"),
+  reportVersion: text("report_version"),
+  testAccounts: json("test_accounts").$type<TestAccount[]>(),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -10,11 +10,13 @@ interface User {
   id: string;
   name: string;
   email: string;
+  organizationName: string | null;
 }
 
 export function SettingsForm({ user }: { user: User }) {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
+  const [organizationName, setOrganizationName] = useState(user.organizationName ?? "");
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -29,7 +31,7 @@ export function SettingsForm({ user }: { user: User }) {
     const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email }),
+      body: JSON.stringify({ name, email, organizationName: organizationName || null }),
     });
 
     setSavingProfile(false);
@@ -97,6 +99,18 @@ export function SettingsForm({ user }: { user: User }) {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="organizationName">Organization name</Label>
+            <Input
+              id="organizationName"
+              value={organizationName}
+              onChange={(e) => setOrganizationName(e.target.value)}
+              placeholder="e.g. Acme Security"
+            />
+            <p className="text-xs text-muted-foreground">
+              Appears as "Prepared by" on exported reports.
+            </p>
           </div>
           <div className="flex justify-end">
             <Button type="submit" size="sm" disabled={savingProfile}>

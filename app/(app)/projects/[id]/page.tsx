@@ -13,28 +13,8 @@ import {
   auditLog,
 } from "@/db/schema";
 import { eq, and, desc, count } from "drizzle-orm";
-import { IconPlus, IconSparkles } from "@tabler/icons-react";
 import { ProjectTabs } from "./project-tabs";
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    in_progress: "bg-[#E6F1FB] text-[#0C447C]",
-    under_review: "bg-[#FAEEDA] text-[#633806]",
-    complete: "bg-[#EAF3DE] text-[#27500A]",
-  };
-  const labels: Record<string, string> = {
-    in_progress: "In Progress",
-    under_review: "Under Review",
-    complete: "Complete",
-  };
-  return (
-    <span
-      className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${styles[status] ?? "bg-muted text-muted-foreground"}`}
-    >
-      {labels[status] ?? status}
-    </span>
-  );
-}
+import { ProjectSidebar } from "./project-sidebar";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -48,6 +28,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       name: project.name,
       status: project.status,
       scope: project.scope,
+      applicationUrl: project.applicationUrl,
+      reportVersion: project.reportVersion,
+      testAccounts: project.testAccounts,
       startDate: project.startDate,
       endDate: project.endDate,
       createdAt: project.createdAt,
@@ -134,75 +117,22 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       <div className="flex flex-1 min-h-0">
         {/* Left metadata panel */}
-        <div className="w-64 shrink-0 bg-background border-r border-border overflow-y-auto p-4">
-          <div className="space-y-3 text-sm">
-            <div>
-              <p className="text-[11px] text-muted-foreground mb-0.5">Status</p>
-              <StatusBadge status={proj.status} />
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground mb-0.5">Customer</p>
-              <p className="text-foreground font-medium">{proj.customerName ?? "—"}</p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground mb-0.5">Playbook</p>
-              <p className="text-foreground">
-                {proj.playbookName ? `${proj.playbookName} — v${proj.playbookVersion}` : "—"}
-              </p>
-            </div>
-            {proj.scope && (
-              <div>
-                <p className="text-[11px] text-muted-foreground mb-0.5">Scope</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{proj.scope}</p>
-              </div>
-            )}
-            {proj.startDate && (
-              <div>
-                <p className="text-[11px] text-muted-foreground mb-0.5">Start date</p>
-                <p className="text-foreground">
-                  {new Date(proj.startDate).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-            )}
-            {proj.endDate && (
-              <div>
-                <p className="text-[11px] text-muted-foreground mb-0.5">End date</p>
-                <p className="text-foreground">
-                  {new Date(proj.endDate).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-            )}
-
-            {/* Risk summary */}
-            <div className="pt-2 border-t border-border">
-              <p className="text-[11px] text-muted-foreground mb-2 uppercase tracking-wide font-medium">
-                Risk summary
-              </p>
-              <div className="grid grid-cols-3 gap-1.5">
-                <div className="bg-[#FCEBEB] rounded-md p-2 text-center">
-                  <p className="text-lg font-semibold text-[#A32D2D]">{highCount?.c ?? 0}</p>
-                  <p className="text-[10px] text-[#A32D2D]">High</p>
-                </div>
-                <div className="bg-[#FAEEDA] rounded-md p-2 text-center">
-                  <p className="text-lg font-semibold text-[#633806]">{medCount?.c ?? 0}</p>
-                  <p className="text-[10px] text-[#633806]">Med</p>
-                </div>
-                <div className="bg-[#EAF3DE] rounded-md p-2 text-center">
-                  <p className="text-lg font-semibold text-[#27500A]">{lowCount?.c ?? 0}</p>
-                  <p className="text-[10px] text-[#27500A]">Low</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProjectSidebar
+          projectId={id}
+          status={proj.status}
+          customerName={proj.customerName ?? null}
+          playbookName={proj.playbookName ?? null}
+          playbookVersion={proj.playbookVersion ?? null}
+          scope={proj.scope ?? null}
+          applicationUrl={proj.applicationUrl ?? null}
+          reportVersion={proj.reportVersion ?? null}
+          testAccounts={proj.testAccounts ?? null}
+          startDate={proj.startDate?.toISOString() ?? null}
+          endDate={proj.endDate?.toISOString() ?? null}
+          highCount={highCount?.c ?? 0}
+          medCount={medCount?.c ?? 0}
+          lowCount={lowCount?.c ?? 0}
+        />
 
         {/* Main content tabs */}
         <div className="flex-1 min-w-0 flex flex-col">

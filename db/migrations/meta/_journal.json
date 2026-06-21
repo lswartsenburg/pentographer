@@ -43,6 +43,13 @@
       "when": 1782066496843,
       "tag": "0005_uneven_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782067253613,
+      "tag": "0006_legal_pyro",
+      "breakpoints": true
     }
   ]
 }
