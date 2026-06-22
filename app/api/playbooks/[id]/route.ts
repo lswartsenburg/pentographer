@@ -8,13 +8,19 @@ import { requireAuth } from "@/lib/auth";
 const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).nullable().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 async function getAccessiblePlaybook(userId: string, id: string) {
   const [row] = await db
     .select()
     .from(playbook)
-    .where(and(eq(playbook.id, id), or(eq(playbook.userId, userId), isNull(playbook.userId))))
+    .where(
+      and(
+        eq(playbook.id, id),
+        or(eq(playbook.userId, userId), isNull(playbook.userId), eq(playbook.isPublic, true))
+      )
+    )
     .limit(1);
   return row ?? null;
 }
@@ -60,6 +66,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .set({
       ...(parsed.data.name !== undefined && { name: parsed.data.name.trim() }),
       ...(parsed.data.description !== undefined && { description: parsed.data.description }),
+      ...(parsed.data.isPublic !== undefined && { isPublic: parsed.data.isPublic }),
     })
     .where(eq(playbook.id, id))
     .returning();

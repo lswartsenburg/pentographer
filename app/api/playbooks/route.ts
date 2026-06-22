@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, or, isNull, desc } from "drizzle-orm";
+import { eq, or, isNull, desc, and, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { playbook, playbookVersion } from "@/db/schema";
@@ -20,10 +20,17 @@ export async function GET() {
       name: playbook.name,
       description: playbook.description,
       userId: playbook.userId,
+      isPublic: playbook.isPublic,
       createdAt: playbook.createdAt,
     })
     .from(playbook)
-    .where(or(eq(playbook.userId, session!.user.id), isNull(playbook.userId)))
+    .where(
+      or(
+        eq(playbook.userId, session!.user.id),
+        isNull(playbook.userId),
+        and(eq(playbook.isPublic, true), ne(playbook.userId, session!.user.id))
+      )
+    )
     .orderBy(desc(playbook.createdAt));
 
   // Attach latest version number for each playbook

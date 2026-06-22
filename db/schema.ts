@@ -67,6 +67,7 @@ export const playbook = pgTable("playbook", {
   }),
   name: text("name").notNull(),
   description: text("description"),
+  isPublic: boolean("is_public").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

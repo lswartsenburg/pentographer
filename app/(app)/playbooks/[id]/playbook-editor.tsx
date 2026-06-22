@@ -18,6 +18,7 @@ import {
   IconTrash,
   IconSearch,
   IconX,
+  IconCopy,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,7 @@ type Playbook = {
   name: string;
   description: string | null;
   userId: string | null;
+  isPublic: boolean;
 };
 
 type ChangeStatus = "added" | "modified" | "removed" | "unchanged";
@@ -198,6 +200,10 @@ export function PlaybookEditor({
   const [selectedItem, setSelectedItem] = useState<PlaybookItem | null>(resolvedInitial);
   const [savingItem, setSavingItem] = useState(false);
   const [itemDraft, setItemDraft] = useState<PlaybookItem | null>(resolvedInitial);
+
+  // Sharing
+  const [localIsPublic, setLocalIsPublic] = useState(playbook.isPublic);
+  const [duplicating, setDuplicating] = useState(false);
 
   // Playbook overview editing
   const [overviewDraft, setOverviewDraft] = useState({
@@ -726,6 +732,45 @@ export function PlaybookEditor({
     router.refresh();
   }
 
+  async function togglePublic() {
+    const next = !localIsPublic;
+    setLocalIsPublic(next);
+    const res = await fetch(`/api/playbooks/${playbook.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isPublic: next }),
+    });
+    if (!res.ok) {
+      setLocalIsPublic(!next);
+      toast.error("Failed to update sharing.");
+    } else {
+      toast.success(next ? "Playbook is now public." : "Playbook is now private.");
+    }
+  }
+
+  async function duplicatePlaybook() {
+    if (!version) return;
+    setDuplicating(true);
+    try {
+      const res = await fetch(`/api/playbooks/${playbook.id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId: version.id }),
+      });
+      if (!res.ok) {
+        toast.error("Failed to duplicate playbook.");
+        return;
+      }
+      const copy = await res.json();
+      toast.success("Playbook duplicated to your account.");
+      router.push(`/playbooks/${copy.id}`);
+    } catch {
+      toast.error("Failed to duplicate playbook.");
+    } finally {
+      setDuplicating(false);
+    }
+  }
+
   return (
     <>
       <Dialog open={aiGenerateOpen} onOpenChange={setAiGenerateOpen}>
@@ -871,6 +916,23 @@ export function PlaybookEditor({
             )}
             {diff && diff.totalChanges === 0 && (
               <span className="text-[11px] text-muted-foreground">No changes</span>
+            )}
+
+            {/* Duplicate — for non-owners viewing any playbook */}
+            {!isOwner && version && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={duplicatePlaybook}
+                disabled={duplicating}
+              >
+                {duplicating ? (
+                  <IconLoader2 size={14} className="animate-spin" />
+                ) : (
+                  <IconCopy size={14} />
+                )}
+                Duplicate to my account
+              </Button>
             )}
 
             {/* AI generate — available to owner; auto-creates draft if needed */}
@@ -1236,11 +1298,27 @@ export function PlaybookEditor({
                       scope, approach, and any special instructions.
                     </p>
                   </div>
-                  {!canEdit && (
+                  {/* Sharing toggle — always visible to owner */}
+                  {isOwner && (
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="space-y-0.5">
+                        <p className="text-sm text-foreground">Share publicly</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Other accounts can see and duplicate this playbook.
+                        </p>
+                      </div>
+                      <Switch checked={localIsPublic} onCheckedChange={togglePublic} />
+                    </div>
+                  )}
+                  {!canEdit && !isOwner && (
                     <p className="text-xs text-muted-foreground bg-muted rounded px-3 py-2">
-                      {!isOwner
-                        ? "This is a shared playbook — you can view it but not edit it."
-                        : "This version is published. Create a draft to make changes."}
+                      This is a shared playbook — you can view it but not edit it. Use
+                      &quot;Duplicate to my account&quot; to get an editable copy.
+                    </p>
+                  )}
+                  {!canEdit && isOwner && (
+                    <p className="text-xs text-muted-foreground bg-muted rounded px-3 py-2">
+                      This version is published. Create a draft to make changes.
                     </p>
                   )}
                 </div>

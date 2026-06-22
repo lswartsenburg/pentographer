@@ -41,7 +41,14 @@ export default async function PlaybookPage({
     .select()
     .from(playbook)
     .where(
-      and(eq(playbook.id, id), or(eq(playbook.userId, session.user.id), isNull(playbook.userId)))
+      and(
+        eq(playbook.id, id),
+        or(
+          eq(playbook.userId, session.user.id),
+          isNull(playbook.userId),
+          eq(playbook.isPublic, true)
+        )
+      )
     )
     .limit(1);
 

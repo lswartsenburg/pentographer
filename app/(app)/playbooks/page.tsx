@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db/client";
 import { playbook, playbookVersion } from "@/db/schema";
-import { eq, or, isNull, desc } from "drizzle-orm";
+import { eq, or, isNull, desc, and, ne } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { IconPlus, IconBook } from "@tabler/icons-react";
 import { NewPlaybookDialog } from "./new-playbook-dialog";
@@ -15,7 +15,13 @@ export default async function PlaybooksPage() {
   const playbooks = await db
     .select()
     .from(playbook)
-    .where(or(eq(playbook.userId, session.user.id), isNull(playbook.userId)))
+    .where(
+      or(
+        eq(playbook.userId, session.user.id),
+        isNull(playbook.userId),
+        and(eq(playbook.isPublic, true), ne(playbook.userId, session.user.id))
+      )
+    )
     .orderBy(desc(playbook.createdAt));
 
   const withVersions = await Promise.all(
@@ -75,6 +81,16 @@ export default async function PlaybooksPage() {
                   {pb.userId === null && (
                     <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
                       System
+                    </span>
+                  )}
+                  {pb.isPublic && pb.userId !== null && pb.userId !== session.user.id && (
+                    <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      Shared
+                    </span>
+                  )}
+                  {pb.isPublic && pb.userId === session.user.id && (
+                    <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      Public
                     </span>
                   )}
                 </div>
