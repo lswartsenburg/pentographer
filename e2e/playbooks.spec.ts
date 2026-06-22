@@ -346,7 +346,7 @@ test.describe.serial("Playbook draft workflow", () => {
     await nameInput.fill("Updated Playbook Name");
 
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Playbook saved.")).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText("Playbook saved.").first()).toBeVisible({ timeout: 8_000 });
 
     // Input persists the saved name after the toast
     await expect(nameInput).toHaveValue("Updated Playbook Name");
@@ -356,7 +356,7 @@ test.describe.serial("Playbook draft workflow", () => {
       .getByPlaceholder("Describe the scope, methodology, and any reviewer instructions")
       .fill("E2E test instructions");
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Playbook saved.")).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText("Playbook saved.").first()).toBeVisible({ timeout: 8_000 });
   });
 
   // ── 11. Add category ─────────────────────────────────────────────────────
@@ -395,7 +395,7 @@ test.describe.serial("Playbook draft workflow", () => {
     await remediationField.fill("E2E remediation text");
 
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Item saved.")).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText("Item saved.").first()).toBeVisible({ timeout: 8_000 });
 
     // After save, the detail panel should still show the saved values
     await expect(descriptionField).toHaveValue("E2E description text");
@@ -419,12 +419,12 @@ test.describe.serial("Playbook draft workflow", () => {
     await expect(activeSwitch).not.toBeChecked();
 
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Item saved.")).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText("Item saved.").first()).toBeVisible({ timeout: 8_000 });
 
     // Toggle back on so subsequent tests are not affected
     await activeSwitch.click();
     await expect(activeSwitch).toBeChecked();
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Item saved.")).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText("Item saved.").first()).toBeVisible({ timeout: 8_000 });
   });
 });
