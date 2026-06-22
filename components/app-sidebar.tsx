@@ -37,9 +37,11 @@ const workNav = [
   { href: "/projects", label: "Projects", icon: IconFolder },
 ];
 
+const isElectron = process.env.NEXT_PUBLIC_ELECTRON === "true";
+
 const resourcesNav = [
   { href: "/playbooks", label: "Playbooks", icon: IconBook },
-  { href: "/templates", label: "Templates", icon: IconTemplate },
+  ...(!isElectron ? [{ href: "/templates", label: "Templates", icon: IconTemplate }] : []),
   { href: "/customers", label: "Customers", icon: IconBuilding },
 ];
 
