@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import Fuse from "fuse.js";
 import * as Popover from "@radix-ui/react-popover";
 import { IconChevronDown, IconSearch, IconX, IconCheck } from "@tabler/icons-react";
 import { cn } from "@/components/ui/utils";
@@ -37,13 +38,18 @@ export function PlaybookItemCombobox({
 
   const selectedItem = items.find((i) => i.id === value) ?? null;
 
-  const filtered = search.trim()
-    ? items.filter(
-        (i) =>
-          i.name.toLowerCase().includes(search.toLowerCase()) ||
-          i.categoryName.toLowerCase().includes(search.toLowerCase())
-      )
-    : items;
+  const fuse = useMemo(
+    () =>
+      new Fuse(items, {
+        keys: ["name", "categoryName"],
+        threshold: 0.35,
+        ignoreLocation: true,
+        minMatchCharLength: 1,
+      }),
+    [items]
+  );
+
+  const filtered = search.trim() ? fuse.search(search).map((r) => r.item) : items;
 
   const grouped = filtered.reduce((acc, item) => {
     const group = acc.get(item.categoryName) ?? [];
