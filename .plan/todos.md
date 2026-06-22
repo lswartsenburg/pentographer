@@ -24,12 +24,14 @@
 - [ ] Search reports and findings
 - [x] Write README.md
 - [x] Write CONTRIBUTING.md
+- [x] Should draft findings appear in a report?
+- [x] Lots of buttons that don't update to pointer when hovering. Like the tabs in the project, or the "+ New version" button. Check all possible buttons and make sure they are updated
 
 - [x] BYOT Word export (template library + marketplace + metadata fields)
 
 - [ ] More secure login features
-- [ ] Make sure that we can upload multiple files at a time for a finding
-- [ ] Make sure that all github workflows use node 24
+- [x] Make sure that we can upload multiple files at a time for a finding
+- [x] Make sure that all github workflows use node 24
 
 - [x] Export (Google Docs, PDF, Word) — needs design thought: template customisation, section ordering, branding. Do this last.
 - [x] How does a user actually create an export from a report? How do they select a template?
