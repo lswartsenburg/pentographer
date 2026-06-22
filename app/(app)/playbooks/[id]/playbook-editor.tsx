@@ -19,6 +19,7 @@ import {
   IconSearch,
   IconX,
   IconCopy,
+  IconDownload,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -748,6 +749,29 @@ export function PlaybookEditor({
     }
   }
 
+  async function exportPlaybook() {
+    try {
+      const res = await fetch(`/api/playbooks/${playbook.id}/export`);
+      if (!res.ok) {
+        toast.error("Failed to export playbook.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const slug = playbook.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      a.href = url;
+      a.download = `${slug}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to export playbook.");
+    }
+  }
+
   async function duplicatePlaybook() {
     if (!version) return;
     setDuplicating(true);
@@ -916,6 +940,14 @@ export function PlaybookEditor({
             )}
             {diff && diff.totalChanges === 0 && (
               <span className="text-[11px] text-muted-foreground">No changes</span>
+            )}
+
+            {/* Export — available to anyone with access */}
+            {version && (
+              <Button variant="outline" size="sm" onClick={exportPlaybook}>
+                <IconDownload size={14} />
+                Export
+              </Button>
             )}
 
             {/* Duplicate — for non-owners viewing any playbook */}

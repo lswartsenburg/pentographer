@@ -7,6 +7,7 @@ import { eq, or, isNull, desc, and, ne } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { IconPlus, IconBook } from "@tabler/icons-react";
 import { NewPlaybookDialog } from "./new-playbook-dialog";
+import { ImportPlaybookButton } from "./import-playbook-button";
 
 export default async function PlaybooksPage() {
   const session = await auth();
@@ -40,12 +41,15 @@ export default async function PlaybooksPage() {
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between border-b border-border h-12 px-5 bg-background">
         <h1 className="text-sm font-medium text-foreground">Playbooks</h1>
-        <NewPlaybookDialog>
-          <Button size="sm">
-            <IconPlus size={14} />
-            New playbook
-          </Button>
-        </NewPlaybookDialog>
+        <div className="flex items-center gap-2">
+          <ImportPlaybookButton />
+          <NewPlaybookDialog>
+            <Button size="sm">
+              <IconPlus size={14} />
+              New playbook
+            </Button>
+          </NewPlaybookDialog>
+        </div>
       </header>
 
       <div className="flex-1 p-5">
