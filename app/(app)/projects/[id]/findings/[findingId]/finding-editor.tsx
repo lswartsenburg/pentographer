@@ -249,7 +249,11 @@ export function FindingEditor({
       const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/ai/draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instruction: draftInstruction.trim() || undefined }),
+        body: JSON.stringify({
+          instruction: draftInstruction.trim() || undefined,
+          notes: description.trim() || undefined,
+          evidenceUrls: evidenceItems.length > 0 ? evidenceItems : undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

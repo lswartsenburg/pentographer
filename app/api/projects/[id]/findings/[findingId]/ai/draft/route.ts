@@ -9,8 +9,12 @@ import { aiErrorMessage } from "@/lib/ai/error";
 import type Anthropic from "@anthropic-ai/sdk";
 import { getStorage } from "@/lib/storage";
 
+const evidenceItemSchema = z.object({ key: z.string(), url: z.string() });
+
 const bodySchema = z.object({
   instruction: z.string().max(2000).optional(),
+  notes: z.string().max(10000).optional(),
+  evidenceUrls: z.array(evidenceItemSchema).max(10).optional(),
 });
 
 const DRAFT_TOOL: Anthropic.Tool = {
@@ -88,10 +92,16 @@ export async function POST(
   const { finding: f, projectName } = result;
 
   let instruction: string | undefined;
+  let notes: string | undefined;
+  let clientEvidenceUrls: { key: string; url: string }[] | undefined;
   try {
     const raw = await req.json().catch(() => ({}));
     const parsed = bodySchema.safeParse(raw);
-    if (parsed.success) instruction = parsed.data.instruction;
+    if (parsed.success) {
+      instruction = parsed.data.instruction;
+      notes = parsed.data.notes;
+      clientEvidenceUrls = parsed.data.evidenceUrls;
+    }
   } catch {
     // no body — fine
   }
@@ -124,9 +134,13 @@ export async function POST(
   }
 
   // Build evidence image blocks (up to 4 images to stay within token limits)
-  const evidenceItems: { key: string; url: string }[] = Array.isArray(latestVersion?.evidenceUrls)
-    ? (latestVersion.evidenceUrls as { key: string; url: string }[]).slice(0, 4)
-    : [];
+  // Prefer client-supplied list (reflects unsaved uploads) over the last DB version
+  const rawEvidence = clientEvidenceUrls
+    ? clientEvidenceUrls
+    : Array.isArray(latestVersion?.evidenceUrls)
+      ? (latestVersion.evidenceUrls as { key: string; url: string }[])
+      : [];
+  const evidenceItems = rawEvidence.slice(0, 4);
 
   const imageBlocks: Anthropic.ImageBlockParam[] = [];
   const imageKeys: string[] = [];
@@ -140,7 +154,9 @@ export async function POST(
   }
 
   // Build the text prompt
-  const hasExisting = !!(latestVersion?.description || latestVersion?.remediation);
+  // notes = tester's raw unsaved text; fall back to saved description if notes not provided
+  const testerNotes = notes?.trim() || latestVersion?.description?.trim() || null;
+  const savedRemediation = latestVersion?.remediation?.trim() || null;
   const hasImages = imageBlocks.length > 0;
 
   let prompt = `You are a senior penetration tester writing a professional security audit finding report.
@@ -149,9 +165,12 @@ Project: ${projectName}
 Finding title: ${f.title}
 Risk level: ${f.riskLevel}${playbookContext}`;
 
-  if (hasExisting) {
-    prompt += `\n\nExisting description (revise and improve this):\n${latestVersion!.description || "(empty)"}`;
-    prompt += `\n\nExisting remediation (revise and improve this):\n${latestVersion!.remediation || "(empty)"}`;
+  if (testerNotes) {
+    prompt += `\n\nTester's notes (use this as your primary source — expand into a professional finding):\n${testerNotes}`;
+  }
+
+  if (savedRemediation) {
+    prompt += `\n\nExisting remediation (revise and improve this):\n${savedRemediation}`;
   }
 
   if (hasImages) {
