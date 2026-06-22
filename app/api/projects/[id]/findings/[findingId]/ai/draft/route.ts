@@ -6,6 +6,7 @@ import { project, finding, findingVersion, playbookItem, playbookCategory } from
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 import { aiErrorMessage } from "@/lib/ai/error";
+import { makeSSE } from "@/lib/ai/sse";
 import type Anthropic from "@anthropic-ai/sdk";
 import { getStorage } from "@/lib/storage";
 
@@ -188,49 +189,53 @@ Risk level: ${f.riskLevel}${playbookContext}`;
     { type: "text", text: prompt },
   ];
 
-  try {
-    const message = await client.messages.create({
-      model: AI_MODEL,
-      max_tokens: 2048,
-      tools: [DRAFT_TOOL],
-      tool_choice: { type: "tool", name: "write_finding" },
-      messages: [{ role: "user", content: userContent }],
-    });
+  return makeSSE(async (send) => {
+    send({ status: "Drafting finding…" });
+    try {
+      const message = await client.messages.create({
+        model: AI_MODEL,
+        max_tokens: 2048,
+        tools: [DRAFT_TOOL],
+        tool_choice: { type: "tool", name: "write_finding" },
+        messages: [{ role: "user", content: userContent }],
+      });
 
-    const block = message.content.find((b) => b.type === "tool_use");
-    if (!block || block.type !== "tool_use") {
-      return NextResponse.json(
-        { error: "AI returned an unexpected response format. Please try again." },
-        { status: 500 }
-      );
+      const block = message.content.find((b) => b.type === "tool_use");
+      if (!block || block.type !== "tool_use") {
+        send({ error: "AI returned an unexpected response format. Please try again." });
+        return;
+      }
+
+      const { description, remediation } = block.input as {
+        description: string;
+        remediation: string;
+      };
+
+      send({ status: "Saving…" });
+
+      const [newVersion] = await db
+        .insert(findingVersion)
+        .values({
+          findingId,
+          title: f.title,
+          description: description?.trim() || null,
+          remediation: remediation?.trim() || null,
+          riskLevel: f.riskLevel,
+          cvssScore: latestVersion?.cvssScore ?? null,
+          status: latestVersion?.status ?? f.status,
+          evidenceUrls: latestVersion?.evidenceUrls ?? [],
+          authorType: "ai",
+        })
+        .returning({ id: findingVersion.id });
+
+      send({
+        done: true,
+        description: description?.trim() ?? "",
+        remediation: remediation?.trim() ?? "",
+        versionId: newVersion.id,
+      });
+    } catch (err) {
+      send({ error: aiErrorMessage(err) });
     }
-
-    const { description, remediation } = block.input as {
-      description: string;
-      remediation: string;
-    };
-
-    const [newVersion] = await db
-      .insert(findingVersion)
-      .values({
-        findingId,
-        title: f.title,
-        description: description?.trim() || null,
-        remediation: remediation?.trim() || null,
-        riskLevel: f.riskLevel,
-        cvssScore: latestVersion?.cvssScore ?? null,
-        status: latestVersion?.status ?? f.status,
-        evidenceUrls: latestVersion?.evidenceUrls ?? [],
-        authorType: "ai",
-      })
-      .returning({ id: findingVersion.id });
-
-    return NextResponse.json({
-      description: description?.trim() ?? "",
-      remediation: remediation?.trim() ?? "",
-      versionId: newVersion.id,
-    });
-  } catch (err) {
-    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 500 });
-  }
+  });
 }

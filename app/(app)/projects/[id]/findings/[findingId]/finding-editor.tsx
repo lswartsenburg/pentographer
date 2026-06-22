@@ -138,6 +138,7 @@ export function FindingEditor({
   const [linkingItem, setLinkingItem] = useState(false);
   const [currentItemId, setCurrentItemId] = useState<string | null>(f.playbookItemId ?? null);
   const [aiLoading, setAiLoading] = useState<"draft" | "review" | null>(null);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [aiDraftOpen, setAiDraftOpen] = useState(false);
   const [draftInstruction, setDraftInstruction] = useState("");
   const [aiReview, setAiReview] = useState<{
@@ -245,6 +246,7 @@ export function FindingEditor({
   async function handleAiDraft() {
     setAiDraftOpen(false);
     setAiLoading("draft");
+    setAiStatus("Drafting…");
     try {
       const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/ai/draft`, {
         method: "POST",
@@ -255,8 +257,8 @@ export function FindingEditor({
           evidenceUrls: evidenceItems.length > 0 ? evidenceItems : undefined,
         }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
         if (data.error === "AI_NOT_CONFIGURED") {
           toast.error("AI features require an ANTHROPIC_API_KEY environment variable.");
         } else {
@@ -264,15 +266,41 @@ export function FindingEditor({
         }
         return;
       }
-      setDescription(data.description ?? "");
-      setRemediation(data.remediation ?? "");
-      setDraftInstruction("");
-      toast.success("AI draft complete. Review and save when ready.");
-      router.refresh();
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const event = JSON.parse(line.slice(6)) as Record<string, unknown>;
+          if (event.status) setAiStatus(event.status as string);
+          if (event.error) {
+            toast.error(
+              event.error === "AI_NOT_CONFIGURED"
+                ? "AI features require an ANTHROPIC_API_KEY environment variable."
+                : (event.error as string)
+            );
+            return;
+          }
+          if (event.done) {
+            setDescription((event.description as string) ?? "");
+            setRemediation((event.remediation as string) ?? "");
+            setDraftInstruction("");
+            toast.success("AI draft complete. Review and save when ready.");
+            router.refresh();
+          }
+        }
+      }
     } catch {
       toast.error("AI draft request failed.");
     } finally {
       setAiLoading(null);
+      setAiStatus(null);
     }
   }
 
@@ -696,7 +724,9 @@ export function FindingEditor({
                   ) : (
                     <IconSparkles size={12} />
                   )}
-                  Draft finding
+                  <span className="truncate">
+                    {aiLoading === "draft" && aiStatus ? aiStatus : "Draft finding"}
+                  </span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
@@ -746,7 +776,7 @@ export function FindingEditor({
               ) : (
                 <IconSparkles size={12} />
               )}
-              Review finding
+              <span className="truncate">Review finding</span>
             </Button>
             {aiReview && (
               <div className="rounded-md border border-[#AFA9EC] bg-[#EEEDFE] p-2.5 space-y-1.5 text-xs">

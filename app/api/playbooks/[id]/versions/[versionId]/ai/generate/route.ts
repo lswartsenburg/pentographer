@@ -6,6 +6,7 @@ import { playbook, playbookVersion, playbookCategory, playbookItem } from "@/db/
 import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 import { aiErrorMessage } from "@/lib/ai/error";
+import { makeSSE } from "@/lib/ai/sse";
 import type Anthropic from "@anthropic-ai/sdk";
 
 const existingItemSchema = z.object({
@@ -224,16 +225,18 @@ export async function POST(
       2
     );
 
-    try {
-      const message = await client.messages.create({
-        model: AI_MODEL,
-        max_tokens: 4096,
-        tools: [PATCH_TOOL],
-        tool_choice: { type: "tool", name: "apply_patch" },
-        messages: [
-          {
-            role: "user",
-            content: `You are a senior penetration tester updating a security testing playbook.
+    return makeSSE(async (send) => {
+      send({ status: "Analyzing changes…" });
+      try {
+        const message = await client.messages.create({
+          model: AI_MODEL,
+          max_tokens: 4096,
+          tools: [PATCH_TOOL],
+          tool_choice: { type: "tool", name: "apply_patch" },
+          messages: [
+            {
+              role: "user",
+              content: `You are a senior penetration tester updating a security testing playbook.
 
 Current playbook content:
 ${existingJson}
@@ -242,248 +245,255 @@ User instruction:
 ${instruction}
 
 Return ONLY the changes needed to fulfil the instruction. Omit any array that would be empty. Category and item names must match the existing content exactly (case-sensitive).`,
+            },
+          ],
+        });
+
+        const input = toolInput(message);
+        if (!input) {
+          send({ error: "AI returned an unexpected response format. Please try again." });
+          return;
+        }
+
+        send({ status: "Applying patch…" });
+
+        const patch = input as {
+          modifyItems?: Array<{
+            categoryName: string;
+            itemName: string;
+            description?: string;
+            defaultRemediation?: string;
+            defaultRisk?: string;
+          }>;
+          addItems?: Array<{
+            categoryName: string;
+            name: string;
+            description?: string;
+            defaultRemediation?: string;
+            defaultRisk?: string;
+          }>;
+          removeItems?: Array<{ categoryName: string; itemName: string }>;
+          addCategories?: Array<{
+            name: string;
+            frameworkRef?: string;
+            items?: Array<{
+              name: string;
+              description?: string;
+              defaultRemediation?: string;
+              defaultRisk?: string;
+            }>;
+          }>;
+          removeCategories?: string[];
+        };
+
+        // Load current DB state
+        const dbCategories = await db
+          .select()
+          .from(playbookCategory)
+          .where(eq(playbookCategory.playbookVersionId, versionId))
+          .orderBy(asc(playbookCategory.displayOrder));
+
+        const dbCatByName = new Map(dbCategories.map((c) => [c.name, c]));
+
+        const dbItemsByCategoryId = new Map<
+          string,
+          { id: string; name: string; displayOrder: number }[]
+        >();
+        for (const cat of dbCategories) {
+          const items = await db
+            .select({
+              id: playbookItem.id,
+              name: playbookItem.name,
+              displayOrder: playbookItem.displayOrder,
+            })
+            .from(playbookItem)
+            .where(eq(playbookItem.categoryId, cat.id))
+            .orderBy(asc(playbookItem.displayOrder));
+          dbItemsByCategoryId.set(cat.id, items);
+        }
+
+        let modified = 0;
+        let added = 0;
+        let removed = 0;
+
+        await db.transaction(async (tx) => {
+          for (const change of patch.modifyItems ?? []) {
+            const cat = dbCatByName.get(change.categoryName);
+            if (!cat) continue;
+            const items = dbItemsByCategoryId.get(cat.id) ?? [];
+            const item = items.find((i) => i.name === change.itemName);
+            if (!item) continue;
+            const updates: Partial<{
+              description: string | null;
+              defaultRemediation: string | null;
+              defaultRisk: "high" | "medium" | "low" | "informational";
+            }> = {};
+            if (change.description !== undefined) updates.description = change.description.trim();
+            if (change.defaultRemediation !== undefined)
+              updates.defaultRemediation = change.defaultRemediation.trim();
+            if (change.defaultRisk !== undefined)
+              updates.defaultRisk = safeRisk(change.defaultRisk);
+            if (Object.keys(updates).length > 0) {
+              await tx.update(playbookItem).set(updates).where(eq(playbookItem.id, item.id));
+              modified++;
+            }
+          }
+
+          for (const change of patch.addItems ?? []) {
+            const cat = dbCatByName.get(change.categoryName);
+            if (!cat) continue;
+            const items = dbItemsByCategoryId.get(cat.id) ?? [];
+            const nextOrder =
+              items.length > 0 ? Math.max(...items.map((i) => i.displayOrder)) + 1 : 0;
+            await tx.insert(playbookItem).values({
+              categoryId: cat.id,
+              name: change.name.trim(),
+              description: change.description?.trim() ?? null,
+              defaultRemediation: change.defaultRemediation?.trim() ?? null,
+              defaultRisk: safeRisk(change.defaultRisk),
+              active: true,
+              displayOrder: nextOrder,
+            });
+            added++;
+          }
+
+          for (const change of patch.removeItems ?? []) {
+            const cat = dbCatByName.get(change.categoryName);
+            if (!cat) continue;
+            const items = dbItemsByCategoryId.get(cat.id) ?? [];
+            const item = items.find((i) => i.name === change.itemName);
+            if (!item) continue;
+            await tx.delete(playbookItem).where(eq(playbookItem.id, item.id));
+            removed++;
+          }
+
+          for (const newCat of patch.addCategories ?? []) {
+            const nextOrder =
+              dbCategories.length > 0
+                ? Math.max(...dbCategories.map((c) => c.displayOrder)) + 1
+                : 0;
+            const [inserted] = await tx
+              .insert(playbookCategory)
+              .values({
+                playbookVersionId: versionId,
+                name: newCat.name.trim(),
+                frameworkRef: newCat.frameworkRef ?? null,
+                displayOrder: nextOrder,
+              })
+              .returning({ id: playbookCategory.id });
+            added++;
+
+            for (let idx = 0; idx < (newCat.items ?? []).length; idx++) {
+              const item = newCat.items![idx];
+              await tx.insert(playbookItem).values({
+                categoryId: inserted.id,
+                name: item.name.trim(),
+                description: item.description?.trim() ?? null,
+                defaultRemediation: item.defaultRemediation?.trim() ?? null,
+                defaultRisk: safeRisk(item.defaultRisk),
+                active: true,
+                displayOrder: idx,
+              });
+              added++;
+            }
+          }
+
+          for (const catName of patch.removeCategories ?? []) {
+            const cat = dbCatByName.get(catName);
+            if (!cat) continue;
+            await tx.delete(playbookItem).where(eq(playbookItem.categoryId, cat.id));
+            await tx.delete(playbookCategory).where(eq(playbookCategory.id, cat.id));
+            removed++;
+          }
+        });
+
+        send({ done: true, patch, counts: { modified, added, removed } });
+      } catch (err) {
+        send({ error: aiErrorMessage(err) });
+      }
+    });
+  }
+
+  // ── GENERATE MODE: full generation from scratch ───────────────────────────
+  return makeSSE(async (send) => {
+    send({ status: "Generating playbook…" });
+    try {
+      const message = await client.messages.create({
+        model: AI_MODEL,
+        max_tokens: 8192,
+        tools: [GENERATE_TOOL],
+        tool_choice: { type: "tool", name: "generate_playbook" },
+        messages: [
+          {
+            role: "user",
+            content: `You are a senior penetration tester creating a security testing playbook.
+
+${instruction}
+
+Generate a comprehensive security testing playbook. Include 4-8 categories relevant to the application, each with 3-6 items. Map to OWASP Top 10 2021 where applicable (use A01:2021 format for frameworkRef). Write clear, actionable descriptions and remediations (2-4 sentences each).`,
           },
         ],
       });
 
       const input = toolInput(message);
       if (!input) {
-        return NextResponse.json(
-          { error: "AI returned an unexpected response format. Please try again." },
-          { status: 500 }
-        );
+        send({ error: "AI returned an unexpected response format. Please try again." });
+        return;
       }
 
-      const patch = input as {
-        modifyItems?: Array<{
-          categoryName: string;
-          itemName: string;
-          description?: string;
-          defaultRemediation?: string;
-          defaultRisk?: string;
-        }>;
-        addItems?: Array<{
-          categoryName: string;
-          name: string;
-          description?: string;
-          defaultRemediation?: string;
-          defaultRisk?: string;
-        }>;
-        removeItems?: Array<{ categoryName: string; itemName: string }>;
-        addCategories?: Array<{
+      const generated = input as {
+        categories: Array<{
           name: string;
           frameworkRef?: string;
-          items?: Array<{
+          items: Array<{
             name: string;
-            description?: string;
-            defaultRemediation?: string;
-            defaultRisk?: string;
+            description: string;
+            defaultRemediation: string;
+            defaultRisk: string;
           }>;
         }>;
-        removeCategories?: string[];
       };
 
-      // Load current DB state
-      const dbCategories = await db
-        .select()
-        .from(playbookCategory)
-        .where(eq(playbookCategory.playbookVersionId, versionId))
-        .orderBy(asc(playbookCategory.displayOrder));
+      send({ status: "Saving items…" });
 
-      const dbCatByName = new Map(dbCategories.map((c) => [c.name, c]));
+      await db.delete(playbookCategory).where(eq(playbookCategory.playbookVersionId, versionId));
 
-      const dbItemsByCategoryId = new Map<
-        string,
-        { id: string; name: string; displayOrder: number }[]
-      >();
-      for (const cat of dbCategories) {
-        const items = await db
-          .select({
-            id: playbookItem.id,
-            name: playbookItem.name,
-            displayOrder: playbookItem.displayOrder,
-          })
-          .from(playbookItem)
-          .where(eq(playbookItem.categoryId, cat.id))
-          .orderBy(asc(playbookItem.displayOrder));
-        dbItemsByCategoryId.set(cat.id, items);
-      }
-
-      let modified = 0;
-      let added = 0;
-      let removed = 0;
+      let totalCategories = 0;
+      let totalItems = 0;
 
       await db.transaction(async (tx) => {
-        for (const change of patch.modifyItems ?? []) {
-          const cat = dbCatByName.get(change.categoryName);
-          if (!cat) continue;
-          const items = dbItemsByCategoryId.get(cat.id) ?? [];
-          const item = items.find((i) => i.name === change.itemName);
-          if (!item) continue;
-          const updates: Partial<{
-            description: string | null;
-            defaultRemediation: string | null;
-            defaultRisk: "high" | "medium" | "low" | "informational";
-          }> = {};
-          if (change.description !== undefined) updates.description = change.description.trim();
-          if (change.defaultRemediation !== undefined)
-            updates.defaultRemediation = change.defaultRemediation.trim();
-          if (change.defaultRisk !== undefined) updates.defaultRisk = safeRisk(change.defaultRisk);
-          if (Object.keys(updates).length > 0) {
-            await tx.update(playbookItem).set(updates).where(eq(playbookItem.id, item.id));
-            modified++;
-          }
-        }
-
-        for (const change of patch.addItems ?? []) {
-          const cat = dbCatByName.get(change.categoryName);
-          if (!cat) continue;
-          const items = dbItemsByCategoryId.get(cat.id) ?? [];
-          const nextOrder =
-            items.length > 0 ? Math.max(...items.map((i) => i.displayOrder)) + 1 : 0;
-          await tx.insert(playbookItem).values({
-            categoryId: cat.id,
-            name: change.name.trim(),
-            description: change.description?.trim() ?? null,
-            defaultRemediation: change.defaultRemediation?.trim() ?? null,
-            defaultRisk: safeRisk(change.defaultRisk),
-            active: true,
-            displayOrder: nextOrder,
-          });
-          added++;
-        }
-
-        for (const change of patch.removeItems ?? []) {
-          const cat = dbCatByName.get(change.categoryName);
-          if (!cat) continue;
-          const items = dbItemsByCategoryId.get(cat.id) ?? [];
-          const item = items.find((i) => i.name === change.itemName);
-          if (!item) continue;
-          await tx.delete(playbookItem).where(eq(playbookItem.id, item.id));
-          removed++;
-        }
-
-        for (const newCat of patch.addCategories ?? []) {
-          const nextOrder =
-            dbCategories.length > 0 ? Math.max(...dbCategories.map((c) => c.displayOrder)) + 1 : 0;
-          const [inserted] = await tx
+        for (let catIdx = 0; catIdx < generated.categories.length; catIdx++) {
+          const cat = generated.categories[catIdx];
+          const [newCat] = await tx
             .insert(playbookCategory)
             .values({
               playbookVersionId: versionId,
-              name: newCat.name.trim(),
-              frameworkRef: newCat.frameworkRef ?? null,
-              displayOrder: nextOrder,
+              name: cat.name.trim(),
+              frameworkRef: cat.frameworkRef ?? null,
+              displayOrder: catIdx,
             })
             .returning({ id: playbookCategory.id });
-          added++;
+          totalCategories++;
 
-          for (let idx = 0; idx < (newCat.items ?? []).length; idx++) {
-            const item = newCat.items![idx];
+          for (let itemIdx = 0; itemIdx < (cat.items ?? []).length; itemIdx++) {
+            const item = cat.items[itemIdx];
             await tx.insert(playbookItem).values({
-              categoryId: inserted.id,
+              categoryId: newCat.id,
               name: item.name.trim(),
               description: item.description?.trim() ?? null,
               defaultRemediation: item.defaultRemediation?.trim() ?? null,
               defaultRisk: safeRisk(item.defaultRisk),
               active: true,
-              displayOrder: idx,
+              displayOrder: itemIdx,
             });
-            added++;
+            totalItems++;
           }
-        }
-
-        for (const catName of patch.removeCategories ?? []) {
-          const cat = dbCatByName.get(catName);
-          if (!cat) continue;
-          await tx.delete(playbookItem).where(eq(playbookItem.categoryId, cat.id));
-          await tx.delete(playbookCategory).where(eq(playbookCategory.id, cat.id));
-          removed++;
         }
       });
 
-      return NextResponse.json({ patch, counts: { modified, added, removed } });
+      send({ done: true, created: { categories: totalCategories, items: totalItems } });
     } catch (err) {
-      return NextResponse.json({ error: aiErrorMessage(err) }, { status: 500 });
+      send({ error: aiErrorMessage(err) });
     }
-  }
-
-  // ── GENERATE MODE: full generation from scratch ───────────────────────────
-  try {
-    const message = await client.messages.create({
-      model: AI_MODEL,
-      max_tokens: 8192,
-      tools: [GENERATE_TOOL],
-      tool_choice: { type: "tool", name: "generate_playbook" },
-      messages: [
-        {
-          role: "user",
-          content: `You are a senior penetration tester creating a security testing playbook.
-
-${instruction}
-
-Generate a comprehensive security testing playbook. Include 4-8 categories relevant to the application, each with 3-6 items. Map to OWASP Top 10 2021 where applicable (use A01:2021 format for frameworkRef). Write clear, actionable descriptions and remediations (2-4 sentences each).`,
-        },
-      ],
-    });
-
-    const input = toolInput(message);
-    if (!input) {
-      return NextResponse.json(
-        { error: "AI returned an unexpected response format. Please try again." },
-        { status: 500 }
-      );
-    }
-
-    const generated = input as {
-      categories: Array<{
-        name: string;
-        frameworkRef?: string;
-        items: Array<{
-          name: string;
-          description: string;
-          defaultRemediation: string;
-          defaultRisk: string;
-        }>;
-      }>;
-    };
-
-    await db.delete(playbookCategory).where(eq(playbookCategory.playbookVersionId, versionId));
-
-    let totalCategories = 0;
-    let totalItems = 0;
-
-    await db.transaction(async (tx) => {
-      for (let catIdx = 0; catIdx < generated.categories.length; catIdx++) {
-        const cat = generated.categories[catIdx];
-        const [newCat] = await tx
-          .insert(playbookCategory)
-          .values({
-            playbookVersionId: versionId,
-            name: cat.name.trim(),
-            frameworkRef: cat.frameworkRef ?? null,
-            displayOrder: catIdx,
-          })
-          .returning({ id: playbookCategory.id });
-        totalCategories++;
-
-        for (let itemIdx = 0; itemIdx < (cat.items ?? []).length; itemIdx++) {
-          const item = cat.items[itemIdx];
-          await tx.insert(playbookItem).values({
-            categoryId: newCat.id,
-            name: item.name.trim(),
-            description: item.description?.trim() ?? null,
-            defaultRemediation: item.defaultRemediation?.trim() ?? null,
-            defaultRisk: safeRisk(item.defaultRisk),
-            active: true,
-            displayOrder: itemIdx,
-          });
-          totalItems++;
-        }
-      }
-    });
-
-    return NextResponse.json({ created: { categories: totalCategories, items: totalItems } });
-  } catch (err) {
-    return NextResponse.json({ error: aiErrorMessage(err) }, { status: 500 });
-  }
+  });
 }
