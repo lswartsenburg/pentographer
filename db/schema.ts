@@ -234,6 +234,18 @@ export const auditLog = pgTable("audit_log", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const apiKey = pgTable("api_key", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => userAccount.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  keyHash: text("key_hash").notNull().unique(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at"),
+  expiresAt: timestamp("expires_at"),
+});
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 export const userAccountRelations = relations(userAccount, ({ many }) => ({
@@ -241,6 +253,7 @@ export const userAccountRelations = relations(userAccount, ({ many }) => ({
   playbooks: many(playbook),
   projects: many(project),
   reportTemplates: many(reportTemplate),
+  apiKeys: many(apiKey),
 }));
 
 export const reportTemplateRelations = relations(reportTemplate, ({ one }) => ({
@@ -316,4 +329,8 @@ export const reportRelations = relations(report, ({ one, many }) => ({
 
 export const reportVersionRelations = relations(reportVersion, ({ one }) => ({
   report: one(report, { fields: [reportVersion.reportId], references: [report.id] }),
+}));
+
+export const apiKeyRelations = relations(apiKey, ({ one }) => ({
+  user: one(userAccount, { fields: [apiKey.userId], references: [userAccount.id] }),
 }));

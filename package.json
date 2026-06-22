@@ -58,6 +58,8 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "fuse.js": "^7.4.2",
+    "graphql": "^16.14.2",
+    "graphql-yoga": "^5.21.2",
     "jszip": "^3.10.1",
     "lucide-react": "^1.20.0",
     "marked": "^18.0.5",

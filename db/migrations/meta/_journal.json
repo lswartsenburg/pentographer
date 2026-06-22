@@ -64,6 +64,20 @@
       "when": 1782081035749,
       "tag": "0008_safe_wendell_rand",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1782143734847,
+      "tag": "0009_nebulous_revanche",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782147710854,
+      "tag": "0010_flimsy_pyro",
+      "breakpoints": true
     }
   ]
 }
