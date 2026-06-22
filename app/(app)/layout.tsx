@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider>
       <AppSidebar user={session.user} />
-      <SidebarInset className="min-h-screen">{children}</SidebarInset>
+      <SidebarInset className="min-h-screen overflow-x-hidden">{children}</SidebarInset>
       <Toaster />
     </SidebarProvider>
   );
