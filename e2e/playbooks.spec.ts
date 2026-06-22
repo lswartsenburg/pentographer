@@ -337,8 +337,8 @@ test.describe.serial("Playbook draft workflow", () => {
     await page.goto(`/playbooks/${playbookId}`);
     await ensureDraftMode(page);
 
-    // The overview detail panel (shown when no item is selected) has class max-w-xl.
-    // It contains exactly one <input> — the Name field.
+    // Open the overview detail panel.
+    await page.getByRole("button", { name: "Overview" }).click();
     const overviewPanel = page.locator(".max-w-xl");
     await expect(overviewPanel).toBeVisible({ timeout: 5_000 });
 
