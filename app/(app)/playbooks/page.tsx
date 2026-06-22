@@ -63,7 +63,7 @@ export default async function PlaybooksPage() {
               <Link
                 key={pb.id}
                 href={`/playbooks/${pb.id}`}
-                className="bg-card border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary/40 transition-colors"
+                className="bg-card border border-border rounded-lg p-4 flex items-center gap-4 hover:border-primary/40 transition-colors min-w-0"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#E6F1FB] shrink-0">
                   <IconBook size={18} className="text-[#0C447C]" />
