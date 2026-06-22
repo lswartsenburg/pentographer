@@ -6,6 +6,8 @@ import { requireAuth } from "@/lib/auth";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 import { aiErrorMessage } from "@/lib/ai/error";
 
+export const maxDuration = 120;
+
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireAuth();
   if (error) return error;

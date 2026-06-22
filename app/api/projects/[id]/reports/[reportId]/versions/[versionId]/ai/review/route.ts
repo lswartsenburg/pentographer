@@ -6,6 +6,8 @@ import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 import { aiErrorMessage } from "@/lib/ai/error";
 import type Anthropic from "@anthropic-ai/sdk";
 
+export const maxDuration = 120;
+
 const reviewSchema = z.object({
   content: z.string().max(50000),
 });

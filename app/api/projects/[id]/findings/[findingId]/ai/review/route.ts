@@ -9,6 +9,8 @@ import { aiErrorMessage } from "@/lib/ai/error";
 import type Anthropic from "@anthropic-ai/sdk";
 import { getStorage } from "@/lib/storage";
 
+export const maxDuration = 120;
+
 const reviewSchema = z.object({
   title: z.string().max(500),
   description: z.string().max(50000).optional().default(""),

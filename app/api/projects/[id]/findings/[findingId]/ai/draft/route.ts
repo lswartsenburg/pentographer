@@ -10,6 +10,8 @@ import { makeSSE } from "@/lib/ai/sse";
 import type Anthropic from "@anthropic-ai/sdk";
 import { getStorage } from "@/lib/storage";
 
+export const maxDuration = 120;
+
 const evidenceItemSchema = z.object({ key: z.string(), url: z.string() });
 
 const bodySchema = z.object({
