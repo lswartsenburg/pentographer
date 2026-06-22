@@ -9,6 +9,7 @@ import { verifyReportVersionAccess } from "@/lib/project-access";
 const patchSchema = z.object({
   execSummary: z.string().optional(),
   reportDate: z.string().datetime().nullable().optional(),
+  includedFindingIds: z.array(z.string().uuid()).nullable().optional(),
 });
 
 export async function GET(
@@ -62,6 +63,9 @@ export async function PATCH(
   }
   if (parsed.data.reportDate !== undefined) {
     updates.reportDate = parsed.data.reportDate ? new Date(parsed.data.reportDate) : null;
+  }
+  if (parsed.data.includedFindingIds !== undefined) {
+    updates.includedFindingIds = parsed.data.includedFindingIds;
   }
 
   const [updated] = await db

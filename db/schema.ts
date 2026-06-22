@@ -198,6 +198,8 @@ export const reportVersion = pgTable("report_version", {
   execSummary: text("exec_summary").notNull().default(""),
   authorType: authorTypeEnum("author_type").notNull().default("human"),
   findingSnapshot: json("finding_snapshot").$type<FindingSnapshotItem[]>(),
+  // null = "all non-draft findings"; string[] = explicit inclusion set (pre-publish)
+  includedFindingIds: json("included_finding_ids").$type<string[]>(),
   reportDate: timestamp("report_date"),
   publishedAt: timestamp("published_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

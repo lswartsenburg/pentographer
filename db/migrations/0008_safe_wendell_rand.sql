@@ -1,0 +1,1 @@
+ALTER TABLE "report_version" ADD COLUMN "included_finding_ids" json;

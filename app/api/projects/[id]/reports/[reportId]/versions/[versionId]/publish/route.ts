@@ -20,14 +20,21 @@ export async function POST(
     return NextResponse.json({ error: "Already published" }, { status: 409 });
   }
 
-  // Snapshot the current latest findingVersion for each finding in the project
-  const findings = await db
-    .select({ id: finding.id })
+  // Determine which findings to include:
+  // - If includedFindingIds is set, use that explicit list
+  // - Otherwise, include all non-draft findings in the project
+  const allFindings = await db
+    .select({ id: finding.id, status: finding.status })
     .from(finding)
     .where(eq(finding.projectId, projectId));
 
+  const includedIds = access.reportVersionRow.includedFindingIds;
+  const eligibleFindings = includedIds
+    ? allFindings.filter((f) => includedIds.includes(f.id))
+    : allFindings.filter((f) => f.status !== "draft");
+
   const snapshot = await Promise.all(
-    findings.map(async ({ id: findingId }) => {
+    eligibleFindings.map(async ({ id: findingId }) => {
       const [latest] = await db
         .select({ id: findingVersion.id })
         .from(findingVersion)

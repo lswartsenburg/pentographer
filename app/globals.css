@@ -133,6 +133,14 @@
     @apply border-border outline-ring/50;
   }
 
+  button:not(:disabled),
+  [role="tab"],
+  [role="button"],
+  label[for],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
   html {
     font-size: var(--font-size);
   }

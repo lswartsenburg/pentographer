@@ -39,6 +39,7 @@ interface ReportVersionEditorProps {
   status: "draft" | "in_review" | "published";
   initialExecSummary: string;
   findings: Finding[];
+  initialIncludedFindingIds: string[] | null;
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -60,6 +61,12 @@ const RISK_COLOR: Record<RiskLevel, string> = {
   informational: "text-muted-foreground",
 };
 
+function defaultIncluded(findings: Finding[], ids: string[] | null): Set<string> {
+  if (ids !== null) return new Set(ids);
+  // Default: include all non-draft findings
+  return new Set(findings.filter((f) => f.status !== "draft").map((f) => f.id));
+}
+
 export function ReportVersionEditor({
   projectId,
   projectName,
@@ -71,6 +78,7 @@ export function ReportVersionEditor({
   status: initialStatus,
   initialExecSummary,
   findings,
+  initialIncludedFindingIds,
 }: ReportVersionEditorProps) {
   const router = useRouter();
   const [execContent, setExecContent] = useState(initialExecSummary);
@@ -88,6 +96,12 @@ export function ReportVersionEditor({
   const [exportTemplateId, setExportTemplateId] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
+
+  // Finding inclusion state (draft/in_review only)
+  const [includedIds, setIncludedIds] = useState<Set<string>>(() =>
+    defaultIncluded(findings, initialIncludedFindingIds)
+  );
+  const [savingInclusion, setSavingInclusion] = useState(false);
 
   useEffect(() => {
     if (!exportOpen) return;
@@ -108,6 +122,26 @@ export function ReportVersionEditor({
     if (typeof window !== "undefined") return DOMPurify.sanitize(raw);
     return raw;
   }, [isPublished, execContent]);
+
+  const includedFindings = isPublished ? findings : findings.filter((f) => includedIds.has(f.id));
+
+  const riskCounts = { high: 0, medium: 0, low: 0, informational: 0 };
+  for (const f of includedFindings) {
+    if (f.riskLevel in riskCounts) riskCounts[f.riskLevel as keyof typeof riskCounts]++;
+  }
+
+  async function toggleFinding(id: string) {
+    const next = new Set(includedIds);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setIncludedIds(next);
+    setSavingInclusion(true);
+    await fetch(apiBase, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ includedFindingIds: [...next] }),
+    });
+    setSavingInclusion(false);
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -240,9 +274,6 @@ export function ReportVersionEditor({
     }
   }
 
-  const riskCounts = { high: 0, medium: 0, low: 0, informational: 0 };
-  for (const f of findings) riskCounts[f.riskLevel]++;
-
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -362,7 +393,7 @@ export function ReportVersionEditor({
       </Dialog>
 
       <div className="flex flex-1 min-h-0">
-        {/* Left panel — finding summary */}
+        {/* Left panel */}
         <div className="w-64 shrink-0 border-r border-border overflow-y-auto p-4 space-y-4">
           <div>
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-2">
@@ -379,14 +410,25 @@ export function ReportVersionEditor({
           </div>
 
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-2">
-              Findings ({findings.length})
-            </p>
-            <div className="space-y-1">
-              {findings.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No findings.</p>
-              ) : (
-                findings.map((f) => (
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+                Findings ({includedFindings.length}
+                {!isPublished && findings.length !== includedFindings.length
+                  ? `/${findings.length}`
+                  : ""}
+                )
+              </p>
+              {!isPublished && savingInclusion && (
+                <IconLoader2 size={11} className="animate-spin text-muted-foreground" />
+              )}
+            </div>
+
+            {findings.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No findings.</p>
+            ) : isPublished ? (
+              // Published: read-only list
+              <div className="space-y-1">
+                {findings.map((f) => (
                   <div key={f.id} className="text-xs text-foreground truncate py-0.5">
                     <span
                       className={`font-medium uppercase text-[10px] mr-1.5 ${RISK_COLOR[f.riskLevel]}`}
@@ -395,9 +437,41 @@ export function ReportVersionEditor({
                     </span>
                     {f.title}
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              // Draft/in_review: checkbox list
+              <div className="space-y-1">
+                {findings.map((f) => {
+                  const isDraft = f.status === "draft";
+                  const checked = includedIds.has(f.id);
+                  return (
+                    <label
+                      key={f.id}
+                      className={`flex items-start gap-2 py-1 cursor-pointer group rounded px-1 -mx-1 hover:bg-muted/50 ${isDraft && !checked ? "opacity-50" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleFinding(f.id)}
+                        className="mt-0.5 shrink-0 accent-primary"
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span
+                          className={`font-medium uppercase text-[10px] mr-1 ${RISK_COLOR[f.riskLevel]}`}
+                        >
+                          {f.riskLevel.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="text-xs text-foreground">{f.title}</span>
+                        {isDraft && (
+                          <span className="ml-1 text-[10px] text-muted-foreground">(draft)</span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {isPublished && (
