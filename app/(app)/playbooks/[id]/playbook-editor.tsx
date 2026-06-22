@@ -227,6 +227,7 @@ export function PlaybookEditor({
   const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
   const [aiGenerateDesc, setAiGenerateDesc] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGenerateStatus, setAiGenerateStatus] = useState<string | null>(null);
 
   const activeItem = itemDraft ?? selectedItem;
   const showOverview = selectedItem === null;
@@ -438,6 +439,7 @@ export function PlaybookEditor({
 
   async function handleAiGenerate() {
     setAiGenerating(true);
+    setAiGenerateStatus(null);
     try {
       // Auto-create a draft if we're currently on the published version
       let targetVersionId = version?.status === "draft" ? version.id : null;
@@ -477,14 +479,42 @@ export function PlaybookEditor({
           }),
         }
       );
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (data.error === "AI_NOT_CONFIGURED") {
+        const errData = await res.json().catch(() => ({}));
+        if (errData.error === "AI_NOT_CONFIGURED") {
           toast.error("AI features require an ANTHROPIC_API_KEY environment variable.");
         } else {
-          toast.error(data.error ?? "AI generation failed.");
+          toast.error(errData.error ?? "AI generation failed.");
         }
         return;
+      }
+
+      let data: Record<string, unknown> = {};
+      {
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const event = JSON.parse(line.slice(6)) as Record<string, unknown>;
+            if (event.status) setAiGenerateStatus(event.status as string);
+            if (event.error) {
+              toast.error(
+                event.error === "AI_NOT_CONFIGURED"
+                  ? "AI features require an ANTHROPIC_API_KEY environment variable."
+                  : (event.error as string)
+              );
+              return;
+            }
+            if (event.done) data = event;
+          }
+        }
       }
 
       if (data.patch) {
@@ -633,7 +663,11 @@ export function PlaybookEditor({
           }
         }
 
-        const { modified = 0, added = 0, removed = 0 } = data.counts ?? {};
+        const {
+          modified = 0,
+          added = 0,
+          removed = 0,
+        } = (data.counts as Record<string, number>) ?? {};
         const parts = [
           modified > 0 ? `${modified} modified` : "",
           added > 0 ? `${added} added` : "",
@@ -667,7 +701,7 @@ export function PlaybookEditor({
           return;
         }
         toast.success(
-          `Generated ${data.created.categories} categories and ${data.created.items} items.`
+          `Generated ${(data.created as { categories: number; items: number }).categories} categories and ${(data.created as { categories: number; items: number }).items} items.`
         );
       }
 
@@ -682,6 +716,7 @@ export function PlaybookEditor({
       toast.error("AI generation failed.");
     } finally {
       setAiGenerating(false);
+      setAiGenerateStatus(null);
     }
   }
 
@@ -840,7 +875,7 @@ export function PlaybookEditor({
                   ) : (
                     <IconSparkles size={13} />
                   )}
-                  {aiGenerating ? "Generating…" : "Generate"}
+                  {aiGenerating ? (aiGenerateStatus ?? "Generating…") : "Generate"}
                 </Button>
               </DisabledTooltip>
             </div>
