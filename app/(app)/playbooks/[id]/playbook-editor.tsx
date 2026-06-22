@@ -224,6 +224,8 @@ export function PlaybookEditor({
   const activeItem = itemDraft ?? selectedItem;
   const showOverview = selectedItem === null;
 
+  const [panelOpen, setPanelOpen] = useState(resolvedInitial !== null);
+
   // Search
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -282,12 +284,19 @@ export function PlaybookEditor({
   function selectItem(item: PlaybookItem) {
     setSelectedItem(item);
     setItemDraft({ ...item });
+    setPanelOpen(true);
     router.replace(`/playbooks/${playbook.id}?item=${item.id}`, { scroll: false });
   }
 
   function selectOverview() {
     setSelectedItem(null);
     setItemDraft(null);
+    setPanelOpen(true);
+    router.replace(`/playbooks/${playbook.id}`, { scroll: false });
+  }
+
+  function closePanel() {
+    setPanelOpen(false);
     router.replace(`/playbooks/${playbook.id}`, { scroll: false });
   }
 
@@ -899,8 +908,8 @@ export function PlaybookEditor({
               </Button>
             )}
 
-            {/* Save — only in draft */}
-            {canEdit && (
+            {/* Save — only in draft, only when panel open */}
+            {canEdit && panelOpen && (
               <Button
                 size="sm"
                 onClick={showOverview ? saveOverview : saveItem}
@@ -915,7 +924,9 @@ export function PlaybookEditor({
 
         <div className="flex flex-1 min-h-0">
           {/* Left panel — structure tree */}
-          <div className="w-60 shrink-0 bg-background border-r border-border overflow-y-auto flex flex-col">
+          <div
+            className={`${panelOpen ? "w-60 shrink-0" : "flex-1"} bg-background border-r border-border overflow-y-auto flex flex-col`}
+          >
             <div className="px-2.5 py-2 border-b border-border">
               <div className="relative flex items-center">
                 <IconSearch
@@ -989,7 +1000,7 @@ export function PlaybookEditor({
                 {/* Overview entry */}
                 <button
                   className={`w-full flex items-center gap-2 px-3.5 py-2.5 text-left text-xs border-b border-border transition-colors cursor-pointer ${
-                    showOverview
+                    showOverview && panelOpen
                       ? "bg-[#E6F1FB] text-[#0C447C] font-medium"
                       : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                   }`}
@@ -1034,7 +1045,9 @@ export function PlaybookEditor({
                               <button
                                 key={item.id}
                                 className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors cursor-pointer ${
-                                  activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
+                                  panelOpen && activeItem?.id === item.id
+                                    ? "bg-[#E6F1FB]"
+                                    : "hover:bg-muted/30"
                                 }`}
                                 onClick={() => selectItem(item)}
                               >
@@ -1049,7 +1062,7 @@ export function PlaybookEditor({
                                 ) : null}
                                 <span
                                   className={`flex-1 text-xs truncate ${
-                                    activeItem?.id === item.id
+                                    panelOpen && activeItem?.id === item.id
                                       ? "text-[#0C447C] font-medium"
                                       : "text-foreground"
                                   }`}
@@ -1178,206 +1191,228 @@ export function PlaybookEditor({
             )}
           </div>
 
-          {/* Right panel */}
-          <div className="flex-1 overflow-y-auto p-5">
-            {showOverview ? (
-              <div className="space-y-5 max-w-xl">
-                <h2 className="text-sm font-semibold text-foreground border-b border-border pb-3">
-                  Overview
-                </h2>
-                <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-                    Name
-                  </Label>
-                  <Input
-                    value={overviewDraft.name}
-                    onChange={(e) => setOverviewDraft((d) => ({ ...d, name: e.target.value }))}
-                    disabled={!canEdit}
-                    className="h-8 text-sm"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-                    Instructions
-                  </Label>
-                  <Textarea
-                    rows={6}
-                    value={overviewDraft.description}
-                    onChange={(e) =>
-                      setOverviewDraft((d) => ({ ...d, description: e.target.value }))
-                    }
-                    disabled={!canEdit}
-                    placeholder="Describe the scope, methodology, and any reviewer instructions for this playbook…"
-                    className="text-xs resize-y"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    This is shown to reviewers when they open the playbook. Use it to explain the
-                    scope, approach, and any special instructions.
-                  </p>
-                </div>
-                {!canEdit && (
-                  <p className="text-xs text-muted-foreground bg-muted rounded px-3 py-2">
-                    {!isOwner
-                      ? "This is a shared playbook — you can view it but not edit it."
-                      : "This version is published. Create a draft to make changes."}
-                  </p>
-                )}
-              </div>
-            ) : !activeItem ? (
-              <p className="text-sm text-muted-foreground">
-                Select an item from the list to edit it.
-              </p>
-            ) : (
-              <div className="space-y-5">
-                <div className="flex items-start justify-between gap-2 border-b border-border pb-3">
-                  <h2 className="text-sm font-semibold text-foreground">{activeItem.name}</h2>
-                  {canEdit && (
+          {/* Right panel — only rendered when open */}
+          {panelOpen && (
+            <div className="flex-1 min-w-0 overflow-y-auto p-5">
+              {showOverview ? (
+                <div className="space-y-5 max-w-xl">
+                  <div className="flex items-center justify-between border-b border-border pb-3">
+                    <h2 className="text-sm font-semibold text-foreground">Overview</h2>
                     <button
-                      onClick={deleteItem}
-                      className="shrink-0 text-muted-foreground hover:text-destructive transition-colors cursor-pointer p-0.5 rounded"
-                      title="Delete item"
+                      onClick={closePanel}
+                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      title="Close"
                     >
-                      <IconTrash size={14} />
+                      <IconX size={14} />
                     </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                      Name
+                    </Label>
+                    <Input
+                      value={overviewDraft.name}
+                      onChange={(e) => setOverviewDraft((d) => ({ ...d, name: e.target.value }))}
+                      disabled={!canEdit}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                      Instructions
+                    </Label>
+                    <Textarea
+                      rows={6}
+                      value={overviewDraft.description}
+                      onChange={(e) =>
+                        setOverviewDraft((d) => ({ ...d, description: e.target.value }))
+                      }
+                      disabled={!canEdit}
+                      placeholder="Describe the scope, methodology, and any reviewer instructions for this playbook…"
+                      className="text-xs resize-y"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      This is shown to reviewers when they open the playbook. Use it to explain the
+                      scope, approach, and any special instructions.
+                    </p>
+                  </div>
+                  {!canEdit && (
+                    <p className="text-xs text-muted-foreground bg-muted rounded px-3 py-2">
+                      {!isOwner
+                        ? "This is a shared playbook — you can view it but not edit it."
+                        : "This version is published. Create a draft to make changes."}
+                    </p>
                   )}
                 </div>
+              ) : !activeItem ? (
+                <p className="text-sm text-muted-foreground">
+                  Select an item from the list to edit it.
+                </p>
+              ) : (
+                <div className="space-y-5">
+                  <div className="flex items-start justify-between gap-2 border-b border-border pb-3">
+                    <h2 className="text-sm font-semibold text-foreground">{activeItem.name}</h2>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {canEdit && (
+                        <button
+                          onClick={deleteItem}
+                          className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer p-0.5 rounded"
+                          title="Delete item"
+                        >
+                          <IconTrash size={14} />
+                        </button>
+                      )}
+                      <button
+                        onClick={closePanel}
+                        className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer p-0.5 rounded"
+                        title="Close"
+                      >
+                        <IconX size={14} />
+                      </button>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Default risk</Label>
+                      <Select
+                        value={activeItem.defaultRisk}
+                        onValueChange={(v) =>
+                          setItemDraft((d) =>
+                            d ? { ...d, defaultRisk: v as PlaybookItem["defaultRisk"] } : null
+                          )
+                        }
+                        disabled={!canEdit}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="informational">Informational</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Framework ref</Label>
+                      <Input
+                        className="h-8 text-xs"
+                        value={activeItem.name}
+                        disabled
+                        placeholder="e.g. A03:2021"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
-                    <Label>Default risk</Label>
-                    <Select
-                      value={activeItem.defaultRisk}
-                      onValueChange={(v) =>
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                      Description (what to look for)
+                    </Label>
+                    <Textarea
+                      rows={5}
+                      className="text-xs font-mono resize-y"
+                      value={activeItem.description ?? ""}
+                      onChange={(e) =>
+                        setItemDraft((d) => (d ? { ...d, description: e.target.value } : null))
+                      }
+                      disabled={!canEdit}
+                      placeholder="Testing guidance for this issue…"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                      Default remediation
+                    </Label>
+                    <Textarea
+                      rows={4}
+                      className="text-xs font-mono resize-y"
+                      value={activeItem.defaultRemediation ?? ""}
+                      onChange={(e) =>
                         setItemDraft((d) =>
-                          d ? { ...d, defaultRisk: v as PlaybookItem["defaultRisk"] } : null
+                          d ? { ...d, defaultRemediation: e.target.value } : null
                         )
                       }
                       disabled={!canEdit}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="informational">Informational</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Framework ref</Label>
-                    <Input
-                      className="h-8 text-xs"
-                      value={activeItem.name}
-                      disabled
-                      placeholder="e.g. A03:2021"
+                      placeholder="How to fix this issue…"
                     />
                   </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-                    Description (what to look for)
-                  </Label>
-                  <Textarea
-                    rows={5}
-                    className="text-xs font-mono resize-y"
-                    value={activeItem.description ?? ""}
-                    onChange={(e) =>
-                      setItemDraft((d) => (d ? { ...d, description: e.target.value } : null))
-                    }
-                    disabled={!canEdit}
-                    placeholder="Testing guidance for this issue…"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-                    Default remediation
-                  </Label>
-                  <Textarea
-                    rows={4}
-                    className="text-xs font-mono resize-y"
-                    value={activeItem.defaultRemediation ?? ""}
-                    onChange={(e) =>
-                      setItemDraft((d) => (d ? { ...d, defaultRemediation: e.target.value } : null))
-                    }
-                    disabled={!canEdit}
-                    placeholder="How to fix this issue…"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-                    Settings
-                  </Label>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-foreground">Active in this version</span>
-                    <Switch
-                      checked={activeItem.active}
-                      onCheckedChange={(v) => setItemDraft((d) => (d ? { ...d, active: v } : null))}
-                      disabled={!canEdit}
-                    />
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                      Settings
+                    </Label>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-foreground">Active in this version</span>
+                      <Switch
+                        checked={activeItem.active}
+                        onCheckedChange={(v) =>
+                          setItemDraft((d) => (d ? { ...d, active: v } : null))
+                        }
+                        disabled={!canEdit}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Changes from published */}
-                {diff?.itemStatus[activeItem.id] === "modified" &&
-                  diff.publishedItems[activeItem.id] &&
-                  (() => {
-                    const pub = diff.publishedItems[activeItem.id];
-                    const changes: { field: string; from: string; to: string }[] = [];
-                    if (activeItem.defaultRisk !== pub.defaultRisk)
-                      changes.push({
-                        field: "Risk",
-                        from: pub.defaultRisk,
-                        to: activeItem.defaultRisk,
-                      });
-                    if (activeItem.active !== pub.active)
-                      changes.push({
-                        field: "Active",
-                        from: pub.active ? "Yes" : "No",
-                        to: activeItem.active ? "Yes" : "No",
-                      });
-                    if (activeItem.description !== pub.description)
-                      changes.push({
-                        field: "Description",
-                        from: pub.description ?? "(empty)",
-                        to: activeItem.description ?? "(empty)",
-                      });
-                    if (activeItem.defaultRemediation !== pub.defaultRemediation)
-                      changes.push({
-                        field: "Remediation",
-                        from: pub.defaultRemediation ?? "(empty)",
-                        to: activeItem.defaultRemediation ?? "(empty)",
-                      });
-                    return changes.length > 0 ? (
-                      <div className="space-y-2 pt-2 border-t border-border">
-                        <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-                          Changes from published
-                        </Label>
-                        <div className="space-y-2">
-                          {changes.map(({ field, from, to }) => (
-                            <div key={field} className="text-xs space-y-0.5">
-                              <span className="font-medium text-foreground">{field}</span>
-                              <div className="flex gap-2">
-                                <span className="text-red-600 line-through break-all max-h-20 overflow-auto font-mono bg-red-50 rounded px-1.5 py-0.5 flex-1">
-                                  {from}
-                                </span>
-                                <span className="text-emerald-700 break-all max-h-20 overflow-auto font-mono bg-emerald-50 rounded px-1.5 py-0.5 flex-1">
-                                  {to}
-                                </span>
+                  {/* Changes from published */}
+                  {diff?.itemStatus[activeItem.id] === "modified" &&
+                    diff.publishedItems[activeItem.id] &&
+                    (() => {
+                      const pub = diff.publishedItems[activeItem.id];
+                      const changes: { field: string; from: string; to: string }[] = [];
+                      if (activeItem.defaultRisk !== pub.defaultRisk)
+                        changes.push({
+                          field: "Risk",
+                          from: pub.defaultRisk,
+                          to: activeItem.defaultRisk,
+                        });
+                      if (activeItem.active !== pub.active)
+                        changes.push({
+                          field: "Active",
+                          from: pub.active ? "Yes" : "No",
+                          to: activeItem.active ? "Yes" : "No",
+                        });
+                      if (activeItem.description !== pub.description)
+                        changes.push({
+                          field: "Description",
+                          from: pub.description ?? "(empty)",
+                          to: activeItem.description ?? "(empty)",
+                        });
+                      if (activeItem.defaultRemediation !== pub.defaultRemediation)
+                        changes.push({
+                          field: "Remediation",
+                          from: pub.defaultRemediation ?? "(empty)",
+                          to: activeItem.defaultRemediation ?? "(empty)",
+                        });
+                      return changes.length > 0 ? (
+                        <div className="space-y-2 pt-2 border-t border-border">
+                          <Label className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                            Changes from published
+                          </Label>
+                          <div className="space-y-2">
+                            {changes.map(({ field, from, to }) => (
+                              <div key={field} className="text-xs space-y-0.5">
+                                <span className="font-medium text-foreground">{field}</span>
+                                <div className="flex gap-2">
+                                  <span className="text-red-600 line-through break-all max-h-20 overflow-auto font-mono bg-red-50 rounded px-1.5 py-0.5 flex-1">
+                                    {from}
+                                  </span>
+                                  <span className="text-emerald-700 break-all max-h-20 overflow-auto font-mono bg-emerald-50 rounded px-1.5 py-0.5 flex-1">
+                                    {to}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ) : null;
-                  })()}
-              </div>
-            )}
-          </div>
+                      ) : null;
+                    })()}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>
