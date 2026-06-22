@@ -246,6 +246,18 @@ export const apiKey = pgTable("api_key", {
   expiresAt: timestamp("expires_at"),
 });
 
+export const oauthClient = pgTable("oauth_client", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => userAccount.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  clientId: text("client_id").notNull().unique(),
+  clientSecretHash: text("client_secret_hash").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at"),
+});
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 export const userAccountRelations = relations(userAccount, ({ many }) => ({
@@ -254,6 +266,7 @@ export const userAccountRelations = relations(userAccount, ({ many }) => ({
   projects: many(project),
   reportTemplates: many(reportTemplate),
   apiKeys: many(apiKey),
+  oauthClients: many(oauthClient),
 }));
 
 export const reportTemplateRelations = relations(reportTemplate, ({ one }) => ({
@@ -333,4 +346,8 @@ export const reportVersionRelations = relations(reportVersion, ({ one }) => ({
 
 export const apiKeyRelations = relations(apiKey, ({ one }) => ({
   user: one(userAccount, { fields: [apiKey.userId], references: [userAccount.id] }),
+}));
+
+export const oauthClientRelations = relations(oauthClient, ({ one }) => ({
+  user: one(userAccount, { fields: [oauthClient.userId], references: [userAccount.id] }),
 }));
