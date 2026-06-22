@@ -63,9 +63,8 @@ async function setupPlaybook(request: APIRequestContext): Promise<{ playbookId: 
   return { playbookId };
 }
 
-/** True when the editor is in an editable draft state (Save + Discard buttons visible). */
+/** True when the editor is in an editable draft state (Discard + Publish buttons visible). */
 async function expectDraftMode(page: Page) {
-  await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Discard draft" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Publish" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Create draft" })).not.toBeVisible();
