@@ -349,6 +349,7 @@ async function seed() {
       version: "1.0",
       changelog: "Initial OWASP Top 10 v2021 playbook.",
       isActive: true,
+      status: "published",
     })
     .returning();
 
