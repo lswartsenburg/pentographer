@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import Fuse from "fuse.js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -15,6 +16,8 @@ import {
   IconEye,
   IconPencil,
   IconTrash,
+  IconSearch,
+  IconX,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -220,6 +223,37 @@ export function PlaybookEditor({
 
   const activeItem = itemDraft ?? selectedItem;
   const showOverview = selectedItem === null;
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  type SearchEntry = PlaybookItem & { categoryName: string };
+
+  const fuse = useMemo(() => {
+    const entries: SearchEntry[] = localCategories.flatMap((cat) =>
+      cat.items.map((item) => ({ ...item, categoryName: cat.name }))
+    );
+    return new Fuse(entries, {
+      keys: [
+        { name: "name", weight: 2 },
+        { name: "categoryName", weight: 1 },
+        { name: "description", weight: 0.5 },
+      ],
+      threshold: 0.35,
+      includeScore: true,
+    });
+  }, [localCategories]);
+
+  const searchResults = useMemo<SearchEntry[]>(() => {
+    if (!searchQuery.trim()) return [];
+    return fuse.search(searchQuery).map((r) => r.item);
+  }, [fuse, searchQuery]);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    searchInputRef.current?.blur();
+  }, []);
 
   const isDraft = version?.status === "draft";
   const canEdit = isOwner && isDraft;
@@ -882,195 +916,265 @@ export function PlaybookEditor({
         <div className="flex flex-1 min-h-0">
           {/* Left panel — structure tree */}
           <div className="w-60 shrink-0 bg-background border-r border-border overflow-y-auto flex flex-col">
-            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border">
-              <span className="text-xs font-medium text-foreground">Structure</span>
-            </div>
-
-            {/* Overview entry */}
-            <button
-              className={`w-full flex items-center gap-2 px-3.5 py-2.5 text-left text-xs border-b border-border transition-colors cursor-pointer ${
-                showOverview
-                  ? "bg-[#E6F1FB] text-[#0C447C] font-medium"
-                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-              }`}
-              onClick={selectOverview}
-            >
-              Overview
-            </button>
-
-            <div className="flex-1">
-              {localCategories.map((cat) => (
-                <div key={cat.id} className="border-b border-border">
+            <div className="px-2.5 py-2 border-b border-border">
+              <div className="relative flex items-center">
+                <IconSearch
+                  size={12}
+                  className="absolute left-2 text-muted-foreground pointer-events-none"
+                />
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && clearSearch()}
+                  placeholder="Search items…"
+                  className="w-full h-7 pl-6 pr-6 text-xs bg-muted/60 rounded-md border border-transparent focus:border-border focus:bg-background outline-none placeholder:text-muted-foreground transition-colors"
+                />
+                {searchQuery && (
                   <button
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/40 transition-colors cursor-pointer"
-                    onClick={() => setExpanded((e) => ({ ...e, [cat.id]: !e[cat.id] }))}
+                    onClick={clearSearch}
+                    className="absolute right-1.5 text-muted-foreground hover:text-foreground"
                   >
-                    {expanded[cat.id] ? (
-                      <IconChevronDown size={12} className="text-muted-foreground shrink-0" />
-                    ) : (
-                      <IconChevronRight size={12} className="text-muted-foreground shrink-0" />
-                    )}
-                    <span className="flex-1 text-xs font-medium text-foreground truncate">
-                      {cat.name}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {diff?.categoryStatus[cat.id] === "added" && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      )}
-                      {diff?.categoryStatus[cat.id] === "modified" && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                      )}
-                      <span className="text-[10px] text-muted-foreground">{cat.items.length}</span>
-                    </div>
-                  </button>
-
-                  {expanded[cat.id] && (
-                    <>
-                      {cat.items.map((item) => {
-                        const itemStatus = diff?.itemStatus[item.id];
-                        return (
-                          <button
-                            key={item.id}
-                            className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors cursor-pointer ${
-                              activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
-                            }`}
-                            onClick={() => selectItem(item)}
-                          >
-                            {itemStatus === "added" && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            )}
-                            {itemStatus === "modified" && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                            )}
-                            {!itemStatus || itemStatus === "unchanged" ? (
-                              <span className="w-1.5 shrink-0" />
-                            ) : null}
-                            <span
-                              className={`flex-1 text-xs truncate ${
-                                activeItem?.id === item.id
-                                  ? "text-[#0C447C] font-medium"
-                                  : "text-foreground"
-                              }`}
-                            >
-                              {item.name}
-                            </span>
-                            <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
-                            >
-                              {riskLabels[item.defaultRisk]}
-                            </span>
-                          </button>
-                        );
-                      })}
-
-                      {/* Removed items (in published but not in draft) */}
-                      {diff?.removedItemsByCategoryId[cat.id]?.map((item) => (
-                        <div
-                          key={item.id}
-                          className="w-full flex items-center gap-2 pl-6 pr-3 py-1.5 border-b border-border opacity-50"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                          <span className="flex-1 text-xs truncate text-muted-foreground line-through">
-                            {item.name}
-                          </span>
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
-                          >
-                            {riskLabels[item.defaultRisk]}
-                          </span>
-                        </div>
-                      ))}
-
-                      {/* Add item */}
-                      {canEdit &&
-                        (addingItemCategoryId === cat.id ? (
-                          <div className="pl-6 pr-3 py-1.5 border-b border-border">
-                            <input
-                              ref={newItemInputRef}
-                              value={newItemName}
-                              onChange={(e) => setNewItemName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") addItem(cat.id);
-                                if (e.key === "Escape") {
-                                  setAddingItemCategoryId(null);
-                                  setNewItemName("");
-                                }
-                              }}
-                              onBlur={() => {
-                                if (!newItemName.trim()) {
-                                  setAddingItemCategoryId(null);
-                                  setNewItemName("");
-                                }
-                              }}
-                              placeholder="Item name…"
-                              className="w-full text-[11px] bg-transparent outline-none border-b border-primary text-foreground placeholder:text-muted-foreground"
-                            />
-                          </div>
-                        ) : (
-                          <button
-                            className="w-full pl-6 pr-3 py-1.5 text-left text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors cursor-pointer flex items-center gap-1"
-                            onClick={() => {
-                              setAddingItemCategoryId(cat.id);
-                              setNewItemName("");
-                            }}
-                          >
-                            <IconPlus size={11} />
-                            Add item
-                          </button>
-                        ))}
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Removed categories (in published but not in draft) */}
-            {diff?.removedCategories.map((cat) => (
-              <div key={cat.id} className="border-b border-border opacity-50">
-                <div className="w-full flex items-center gap-2 px-3 py-2.5">
-                  <IconChevronDown size={12} className="text-muted-foreground shrink-0" />
-                  <span className="flex-1 text-xs font-medium text-muted-foreground line-through truncate">
-                    {cat.name}
-                  </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                </div>
-              </div>
-            ))}
-
-            {/* Add category */}
-            {canEdit && (
-              <div className="border-t border-border p-2">
-                {addingCategory ? (
-                  <input
-                    ref={newCategoryInputRef}
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") addCategory();
-                      if (e.key === "Escape") {
-                        setAddingCategory(false);
-                        setNewCategoryName("");
-                      }
-                    }}
-                    onBlur={() => {
-                      if (!newCategoryName.trim()) {
-                        setAddingCategory(false);
-                        setNewCategoryName("");
-                      }
-                    }}
-                    placeholder="Category name…"
-                    className="w-full text-[11px] px-2 py-1.5 bg-transparent outline-none border border-primary rounded text-foreground placeholder:text-muted-foreground"
-                  />
-                ) : (
-                  <button
-                    className="w-full flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer px-1.5 py-1"
-                    onClick={() => setAddingCategory(true)}
-                  >
-                    <IconPlus size={11} />
-                    Add category
+                    <IconX size={11} />
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Search results */}
+            {searchQuery.trim() && (
+              <div className="flex-1 overflow-y-auto">
+                {searchResults.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-3.5 py-3">No results.</p>
+                ) : (
+                  searchResults.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        selectItem(item);
+                        clearSearch();
+                      }}
+                      className={`w-full flex flex-col gap-0.5 px-3.5 py-2 text-left border-b border-border transition-colors cursor-pointer hover:bg-muted/40 ${
+                        activeItem?.id === item.id ? "bg-[#E6F1FB]" : ""
+                      }`}
+                    >
+                      <span
+                        className={`text-xs truncate ${
+                          activeItem?.id === item.id
+                            ? "text-[#0C447C] font-medium"
+                            : "text-foreground"
+                        }`}
+                      >
+                        {item.name}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          {item.categoryName}
+                        </span>
+                        <span
+                          className={`text-[10px] px-1 py-0 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
+                        >
+                          {riskLabels[item.defaultRisk]}
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Normal tree (hidden when searching) */}
+            {!searchQuery.trim() && (
+              <>
+                {/* Overview entry */}
+                <button
+                  className={`w-full flex items-center gap-2 px-3.5 py-2.5 text-left text-xs border-b border-border transition-colors cursor-pointer ${
+                    showOverview
+                      ? "bg-[#E6F1FB] text-[#0C447C] font-medium"
+                      : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                  }`}
+                  onClick={selectOverview}
+                >
+                  Overview
+                </button>
+
+                <div className="flex-1">
+                  {localCategories.map((cat) => (
+                    <div key={cat.id} className="border-b border-border">
+                      <button
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/40 transition-colors cursor-pointer"
+                        onClick={() => setExpanded((e) => ({ ...e, [cat.id]: !e[cat.id] }))}
+                      >
+                        {expanded[cat.id] ? (
+                          <IconChevronDown size={12} className="text-muted-foreground shrink-0" />
+                        ) : (
+                          <IconChevronRight size={12} className="text-muted-foreground shrink-0" />
+                        )}
+                        <span className="flex-1 text-xs font-medium text-foreground truncate">
+                          {cat.name}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {diff?.categoryStatus[cat.id] === "added" && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          )}
+                          {diff?.categoryStatus[cat.id] === "modified" && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                          )}
+                          <span className="text-[10px] text-muted-foreground">
+                            {cat.items.length}
+                          </span>
+                        </div>
+                      </button>
+
+                      {expanded[cat.id] && (
+                        <>
+                          {cat.items.map((item) => {
+                            const itemStatus = diff?.itemStatus[item.id];
+                            return (
+                              <button
+                                key={item.id}
+                                className={`w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left border-b border-border last:border-0 transition-colors cursor-pointer ${
+                                  activeItem?.id === item.id ? "bg-[#E6F1FB]" : "hover:bg-muted/30"
+                                }`}
+                                onClick={() => selectItem(item)}
+                              >
+                                {itemStatus === "added" && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                )}
+                                {itemStatus === "modified" && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                                )}
+                                {!itemStatus || itemStatus === "unchanged" ? (
+                                  <span className="w-1.5 shrink-0" />
+                                ) : null}
+                                <span
+                                  className={`flex-1 text-xs truncate ${
+                                    activeItem?.id === item.id
+                                      ? "text-[#0C447C] font-medium"
+                                      : "text-foreground"
+                                  }`}
+                                >
+                                  {item.name}
+                                </span>
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
+                                >
+                                  {riskLabels[item.defaultRisk]}
+                                </span>
+                              </button>
+                            );
+                          })}
+
+                          {/* Removed items (in published but not in draft) */}
+                          {diff?.removedItemsByCategoryId[cat.id]?.map((item) => (
+                            <div
+                              key={item.id}
+                              className="w-full flex items-center gap-2 pl-6 pr-3 py-1.5 border-b border-border opacity-50"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                              <span className="flex-1 text-xs truncate text-muted-foreground line-through">
+                                {item.name}
+                              </span>
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${riskColors[item.defaultRisk]}`}
+                              >
+                                {riskLabels[item.defaultRisk]}
+                              </span>
+                            </div>
+                          ))}
+
+                          {/* Add item */}
+                          {canEdit &&
+                            (addingItemCategoryId === cat.id ? (
+                              <div className="pl-6 pr-3 py-1.5 border-b border-border">
+                                <input
+                                  ref={newItemInputRef}
+                                  value={newItemName}
+                                  onChange={(e) => setNewItemName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") addItem(cat.id);
+                                    if (e.key === "Escape") {
+                                      setAddingItemCategoryId(null);
+                                      setNewItemName("");
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    if (!newItemName.trim()) {
+                                      setAddingItemCategoryId(null);
+                                      setNewItemName("");
+                                    }
+                                  }}
+                                  placeholder="Item name…"
+                                  className="w-full text-[11px] bg-transparent outline-none border-b border-primary text-foreground placeholder:text-muted-foreground"
+                                />
+                              </div>
+                            ) : (
+                              <button
+                                className="w-full pl-6 pr-3 py-1.5 text-left text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors cursor-pointer flex items-center gap-1"
+                                onClick={() => {
+                                  setAddingItemCategoryId(cat.id);
+                                  setNewItemName("");
+                                }}
+                              >
+                                <IconPlus size={11} />
+                                Add item
+                              </button>
+                            ))}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Removed categories (in published but not in draft) */}
+                {diff?.removedCategories.map((cat) => (
+                  <div key={cat.id} className="border-b border-border opacity-50">
+                    <div className="w-full flex items-center gap-2 px-3 py-2.5">
+                      <IconChevronDown size={12} className="text-muted-foreground shrink-0" />
+                      <span className="flex-1 text-xs font-medium text-muted-foreground line-through truncate">
+                        {cat.name}
+                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add category */}
+                {canEdit && (
+                  <div className="border-t border-border p-2">
+                    {addingCategory ? (
+                      <input
+                        ref={newCategoryInputRef}
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") addCategory();
+                          if (e.key === "Escape") {
+                            setAddingCategory(false);
+                            setNewCategoryName("");
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!newCategoryName.trim()) {
+                            setAddingCategory(false);
+                            setNewCategoryName("");
+                          }
+                        }}
+                        placeholder="Category name…"
+                        className="w-full text-[11px] px-2 py-1.5 bg-transparent outline-none border border-primary rounded text-foreground placeholder:text-muted-foreground"
+                      />
+                    ) : (
+                      <button
+                        className="w-full flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer px-1.5 py-1"
+                        onClick={() => setAddingCategory(true)}
+                      >
+                        <IconPlus size={11} />
+                        Add category
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
