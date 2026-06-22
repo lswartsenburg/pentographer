@@ -43,7 +43,7 @@
 - [ ] Add search to the playbook page
 - [x] Create external GraphQL API
 - [x] Create an MCP
-- [ ] AI features take a long time and there is no indication of progress aside from a spinner
+- [x] AI features take a long time and there is no indication of progress aside from a spinner
 
 # Three deployment tiers (corporations are reluctant to use a cloud version with sensitive pentest data)
 
