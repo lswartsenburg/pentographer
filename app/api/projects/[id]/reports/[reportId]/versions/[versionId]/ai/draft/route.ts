@@ -7,6 +7,8 @@ import { verifyReportVersionAccess } from "@/lib/project-access";
 import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 import { aiErrorMessage } from "@/lib/ai/error";
 
+export const maxDuration = 120;
+
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; reportId: string; versionId: string }> }

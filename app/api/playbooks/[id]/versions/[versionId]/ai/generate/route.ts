@@ -9,6 +9,8 @@ import { aiErrorMessage } from "@/lib/ai/error";
 import { makeSSE } from "@/lib/ai/sse";
 import type Anthropic from "@anthropic-ai/sdk";
 
+export const maxDuration = 120;
+
 const existingItemSchema = z.object({
   name: z.string(),
   description: z.string().nullable().optional(),
@@ -418,7 +420,8 @@ Return ONLY the changes needed to fulfil the instruction. Omit any array that wo
   return makeSSE(async (send) => {
     send({ status: "Generating playbook…" });
     try {
-      const message = await client.messages.create({
+      let accumulatedJson = "";
+      const stream = await client.messages.stream({
         model: AI_MODEL,
         max_tokens: 8192,
         tools: [GENERATE_TOOL],
@@ -435,6 +438,14 @@ Generate a comprehensive security testing playbook. Include 4-8 categories relev
         ],
       });
 
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "input_json_delta") {
+          accumulatedJson += event.delta.partial_json;
+          send({ status: "Generating playbook…", chars: accumulatedJson.length });
+        }
+      }
+
+      const message = await stream.finalMessage();
       const input = toolInput(message);
       if (!input) {
         send({ error: "AI returned an unexpected response format. Please try again." });

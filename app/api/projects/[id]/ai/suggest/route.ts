@@ -7,6 +7,8 @@ import { getAnthropicClient, AI_MODEL } from "@/lib/ai/client";
 import { aiErrorMessage } from "@/lib/ai/error";
 import type Anthropic from "@anthropic-ai/sdk";
 
+export const maxDuration = 120;
+
 const SUGGEST_TOOL: Anthropic.Tool = {
   name: "suggest_items",
   description: "Suggest uncovered playbook items worth investigating based on existing findings.",
