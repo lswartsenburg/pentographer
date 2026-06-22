@@ -246,7 +246,7 @@ export function FindingEditor({
   async function handleAiDraft() {
     setAiDraftOpen(false);
     setAiLoading("draft");
-    setAiStatus("Analyzing finding data…");
+    setAiStatus("Drafting…");
     try {
       const res = await fetch(`/api/projects/${projectId}/findings/${f.id}/ai/draft`, {
         method: "POST",
@@ -724,7 +724,9 @@ export function FindingEditor({
                   ) : (
                     <IconSparkles size={12} />
                   )}
-                  {aiLoading === "draft" && aiStatus ? aiStatus : "Draft finding"}
+                  <span className="truncate">
+                    {aiLoading === "draft" && aiStatus ? aiStatus : "Draft finding"}
+                  </span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
@@ -774,7 +776,7 @@ export function FindingEditor({
               ) : (
                 <IconSparkles size={12} />
               )}
-              Review finding
+              <span className="truncate">Review finding</span>
             </Button>
             {aiReview && (
               <div className="rounded-md border border-[#AFA9EC] bg-[#EEEDFE] p-2.5 space-y-1.5 text-xs">

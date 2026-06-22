@@ -454,7 +454,7 @@ Generate a comprehensive security testing playbook. Include 4-8 categories relev
         }>;
       };
 
-      send({ status: "Saving categories and items…" });
+      send({ status: "Saving items…" });
 
       await db.delete(playbookCategory).where(eq(playbookCategory.playbookVersionId, versionId));
 

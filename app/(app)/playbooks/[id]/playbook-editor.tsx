@@ -875,7 +875,9 @@ export function PlaybookEditor({
                   ) : (
                     <IconSparkles size={13} />
                   )}
-                  {aiGenerating ? (aiGenerateStatus ?? "Generating…") : "Generate"}
+                  <span className="truncate">
+                    {aiGenerating ? (aiGenerateStatus ?? "Generating…") : "Generate"}
+                  </span>
                 </Button>
               </DisabledTooltip>
             </div>

@@ -190,7 +190,7 @@ Risk level: ${f.riskLevel}${playbookContext}`;
   ];
 
   return makeSSE(async (send) => {
-    send({ status: "Writing description and remediation…" });
+    send({ status: "Drafting finding…" });
     try {
       const message = await client.messages.create({
         model: AI_MODEL,
@@ -211,7 +211,7 @@ Risk level: ${f.riskLevel}${playbookContext}`;
         remediation: string;
       };
 
-      send({ status: "Saving version…" });
+      send({ status: "Saving…" });
 
       const [newVersion] = await db
         .insert(findingVersion)
