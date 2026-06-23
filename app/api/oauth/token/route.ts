@@ -56,9 +56,10 @@ export async function POST(req: NextRequest) {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const accessToken = await new SignJWT({ cid: client.clientId })
+  // sub = clientId (org-scoped identifier); oid = organizationId for direct org resolution
+  const accessToken = await new SignJWT({ cid: client.clientId, oid: client.organizationId })
     .setProtectedHeader({ alg: "HS256" })
-    .setSubject(client.userId)
+    .setSubject(client.clientId)
     .setIssuedAt(now)
     .setExpirationTime(now + TOKEN_TTL)
     .sign(new TextEncoder().encode(authSecret));

@@ -3,7 +3,7 @@ import { hash } from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { userAccount } from "@/db/schema";
+import { userAccount, organization, organizationMember } from "@/db/schema";
 
 const registerSchema = z.object({
   name: z.string().min(1).max(100),
@@ -48,10 +48,23 @@ export async function POST(request: NextRequest) {
 
   const passwordHash = await hash(password, 12);
 
-  await db.insert(userAccount).values({
-    name: name.trim(),
-    email: email.toLowerCase(),
-    passwordHash,
+  await db.transaction(async (tx) => {
+    const [user] = await tx
+      .insert(userAccount)
+      .values({ name: name.trim(), email: email.toLowerCase(), passwordHash })
+      .returning({ id: userAccount.id, name: userAccount.name });
+
+    const orgName = `${user.name}'s Workspace`;
+    const [org] = await tx
+      .insert(organization)
+      .values({ name: orgName })
+      .returning({ id: organization.id });
+
+    await tx
+      .insert(organizationMember)
+      .values({ organizationId: org.id, userId: user.id, role: "owner" });
+
+    await tx.update(userAccount).set({ personalOrgId: org.id }).where(eq(userAccount.id, user.id));
   });
 
   return NextResponse.json({ success: true }, { status: 201 });

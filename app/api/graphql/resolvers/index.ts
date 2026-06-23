@@ -17,6 +17,7 @@ import type { GraphQLContext } from "../context";
 export const resolvers = {
   Query: {
     me: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
+      if (!ctx.userId) return null;
       const [user] = await db
         .select()
         .from(userAccount)
@@ -29,7 +30,7 @@ export const resolvers = {
       return db
         .select()
         .from(customer)
-        .where(eq(customer.userId, ctx.userId))
+        .where(eq(customer.organizationId, ctx.orgId))
         .orderBy(asc(customer.name));
     },
 
@@ -37,13 +38,13 @@ export const resolvers = {
       const [row] = await db
         .select()
         .from(customer)
-        .where(and(eq(customer.id, id), eq(customer.userId, ctx.userId)))
+        .where(and(eq(customer.id, id), eq(customer.organizationId, ctx.orgId)))
         .limit(1);
       return row ?? null;
     },
 
     projects: async (_: unknown, { customerId }: { customerId?: string }, ctx: GraphQLContext) => {
-      const conditions = [eq(project.userId, ctx.userId)];
+      const conditions = [eq(project.organizationId, ctx.orgId)];
       if (customerId) conditions.push(eq(project.customerId, customerId));
       return db
         .select()
@@ -56,7 +57,7 @@ export const resolvers = {
       const [row] = await db
         .select()
         .from(project)
-        .where(and(eq(project.id, id), eq(project.userId, ctx.userId)))
+        .where(and(eq(project.id, id), eq(project.organizationId, ctx.orgId)))
         .limit(1);
       return row ?? null;
     },
@@ -65,13 +66,7 @@ export const resolvers = {
       return db
         .select()
         .from(playbook)
-        .where(
-          or(
-            eq(playbook.userId, ctx.userId),
-            isNull(playbook.userId),
-            and(eq(playbook.isPublic, true))
-          )
-        )
+        .where(or(eq(playbook.organizationId, ctx.orgId), isNull(playbook.organizationId)))
         .orderBy(asc(playbook.name));
     },
 
@@ -82,11 +77,7 @@ export const resolvers = {
         .where(
           and(
             eq(playbook.id, id),
-            or(
-              eq(playbook.userId, ctx.userId),
-              isNull(playbook.userId),
-              eq(playbook.isPublic, true)
-            )
+            or(eq(playbook.organizationId, ctx.orgId), isNull(playbook.organizationId))
           )
         )
         .limit(1);
@@ -99,7 +90,7 @@ export const resolvers = {
       return db
         .select()
         .from(project)
-        .where(and(eq(project.customerId, parent.id), eq(project.userId, ctx.userId)));
+        .where(and(eq(project.customerId, parent.id), eq(project.organizationId, ctx.orgId)));
     },
   },
 
@@ -219,7 +210,7 @@ export const resolvers = {
       const [proj] = await db
         .select({ id: project.id })
         .from(project)
-        .where(and(eq(project.id, projectId), eq(project.userId, ctx.userId)))
+        .where(and(eq(project.id, projectId), eq(project.organizationId, ctx.orgId)))
         .limit(1);
       if (!proj) throw new GraphQLError("Project not found", { extensions: { code: "NOT_FOUND" } });
 
@@ -265,12 +256,12 @@ export const resolvers = {
       },
       ctx: GraphQLContext
     ) => {
-      // Verify ownership via project
+      // Verify org access via project
       const [row] = await db
-        .select({ f: finding, projectUserId: project.userId })
+        .select({ f: finding, projectOrgId: project.organizationId })
         .from(finding)
         .innerJoin(project, eq(finding.projectId, project.id))
-        .where(and(eq(finding.id, findingId), eq(project.userId, ctx.userId)))
+        .where(and(eq(finding.id, findingId), eq(project.organizationId, ctx.orgId)))
         .limit(1);
       if (!row) throw new GraphQLError("Finding not found", { extensions: { code: "NOT_FOUND" } });
 
@@ -320,12 +311,12 @@ export const resolvers = {
       },
       ctx: GraphQLContext
     ) => {
-      // Verify ownership via project
+      // Verify org access via project
       const [row] = await db
         .select({ f: finding })
         .from(finding)
         .innerJoin(project, eq(finding.projectId, project.id))
-        .where(and(eq(finding.id, findingId), eq(project.userId, ctx.userId)))
+        .where(and(eq(finding.id, findingId), eq(project.organizationId, ctx.orgId)))
         .limit(1);
       if (!row) throw new GraphQLError("Finding not found", { extensions: { code: "NOT_FOUND" } });
 
@@ -376,6 +367,7 @@ export const resolvers = {
       const [pb] = await db
         .insert(playbook)
         .values({
+          organizationId: ctx.orgId,
           userId: ctx.userId,
           name: input.name.trim(),
           description: input.description ?? null,
@@ -409,7 +401,7 @@ export const resolvers = {
       const [existing] = await db
         .select({ id: playbook.id })
         .from(playbook)
-        .where(and(eq(playbook.id, id), eq(playbook.userId, ctx.userId)))
+        .where(and(eq(playbook.id, id), eq(playbook.organizationId, ctx.orgId)))
         .limit(1);
       if (!existing)
         throw new GraphQLError("Playbook not found", { extensions: { code: "NOT_FOUND" } });
@@ -434,7 +426,7 @@ export const resolvers = {
       const [pb] = await db
         .select({ id: playbook.id })
         .from(playbook)
-        .where(and(eq(playbook.id, playbookId), eq(playbook.userId, ctx.userId)))
+        .where(and(eq(playbook.id, playbookId), eq(playbook.organizationId, ctx.orgId)))
         .limit(1);
       if (!pb) throw new GraphQLError("Playbook not found", { extensions: { code: "NOT_FOUND" } });
 
@@ -463,12 +455,12 @@ export const resolvers = {
       { versionId }: { versionId: string },
       ctx: GraphQLContext
     ) => {
-      // Verify ownership
+      // Verify org access
       const [ver] = await db
-        .select({ v: playbookVersion, userId: playbook.userId })
+        .select({ v: playbookVersion, orgId: playbook.organizationId })
         .from(playbookVersion)
         .innerJoin(playbook, eq(playbookVersion.playbookId, playbook.id))
-        .where(and(eq(playbookVersion.id, versionId), eq(playbook.userId, ctx.userId)))
+        .where(and(eq(playbookVersion.id, versionId), eq(playbook.organizationId, ctx.orgId)))
         .limit(1);
       if (!ver) throw new GraphQLError("Version not found", { extensions: { code: "NOT_FOUND" } });
 
@@ -492,12 +484,12 @@ export const resolvers = {
       },
       ctx: GraphQLContext
     ) => {
-      // Verify ownership
+      // Verify org access
       const [ver] = await db
         .select({ v: playbookVersion })
         .from(playbookVersion)
         .innerJoin(playbook, eq(playbookVersion.playbookId, playbook.id))
-        .where(and(eq(playbookVersion.id, versionId), eq(playbook.userId, ctx.userId)))
+        .where(and(eq(playbookVersion.id, versionId), eq(playbook.organizationId, ctx.orgId)))
         .limit(1);
       if (!ver) throw new GraphQLError("Version not found", { extensions: { code: "NOT_FOUND" } });
 
@@ -531,13 +523,13 @@ export const resolvers = {
       },
       ctx: GraphQLContext
     ) => {
-      // Verify ownership via category → version → playbook
+      // Verify org access via category → version → playbook
       const [cat] = await db
         .select({ c: playbookCategory })
         .from(playbookCategory)
         .innerJoin(playbookVersion, eq(playbookCategory.playbookVersionId, playbookVersion.id))
         .innerJoin(playbook, eq(playbookVersion.playbookId, playbook.id))
-        .where(and(eq(playbookCategory.id, categoryId), eq(playbook.userId, ctx.userId)))
+        .where(and(eq(playbookCategory.id, categoryId), eq(playbook.organizationId, ctx.orgId)))
         .limit(1);
       if (!cat) throw new GraphQLError("Category not found", { extensions: { code: "NOT_FOUND" } });
 
@@ -580,7 +572,7 @@ export const resolvers = {
         .innerJoin(playbookCategory, eq(playbookItem.categoryId, playbookCategory.id))
         .innerJoin(playbookVersion, eq(playbookCategory.playbookVersionId, playbookVersion.id))
         .innerJoin(playbook, eq(playbookVersion.playbookId, playbook.id))
-        .where(and(eq(playbookItem.id, itemId), eq(playbook.userId, ctx.userId)))
+        .where(and(eq(playbookItem.id, itemId), eq(playbook.organizationId, ctx.orgId)))
         .limit(1);
       if (!item) throw new GraphQLError("Item not found", { extensions: { code: "NOT_FOUND" } });
 

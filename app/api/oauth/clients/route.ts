@@ -1,14 +1,19 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/db/client";
 import { oauthClient } from "@/db/schema";
+import { getOrgRole } from "@/lib/org-access";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const role = await getOrgRole(session.user.id, session.user.orgId);
+  const isAdmin = role === "admin" || role === "owner";
+
+  // Admins see all org clients; members see only their own
   const clients = await db
     .select({
       id: oauthClient.id,
@@ -18,7 +23,14 @@ export async function GET() {
       lastUsedAt: oauthClient.lastUsedAt,
     })
     .from(oauthClient)
-    .where(eq(oauthClient.userId, session.user.id))
+    .where(
+      isAdmin
+        ? eq(oauthClient.organizationId, session.user.orgId)
+        : and(
+            eq(oauthClient.organizationId, session.user.orgId),
+            eq(oauthClient.userId, session.user.id)
+          )
+    )
     .orderBy(desc(oauthClient.createdAt));
 
   return NextResponse.json(clients);
@@ -39,6 +51,7 @@ export async function POST(req: NextRequest) {
   const [client] = await db
     .insert(oauthClient)
     .values({
+      organizationId: session.user.orgId,
       userId: session.user.id,
       name,
       clientId: rawClientId,

@@ -18,18 +18,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   if (!original) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (original.userId === session!.user.id) {
-    return NextResponse.json({ error: "This is already your template" }, { status: 409 });
+  if (original.organizationId === session!.user.orgId) {
+    return NextResponse.json(
+      { error: "This template already belongs to your organization" },
+      { status: 409 }
+    );
   }
 
   const safeName = original.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const toPathname = `templates/${session!.user.id}/${Date.now()}-${safeName}`;
+  const toPathname = `templates/${session!.user.orgId}/${Date.now()}-${safeName}`;
 
   const blob = await getStorage().copy(original.blobUrl, toPathname);
 
   const [newRow] = await db
     .insert(reportTemplate)
     .values({
+      organizationId: session!.user.orgId,
       userId: session!.user.id,
       name: original.name,
       description: original.description,

@@ -44,7 +44,7 @@ async function run() {
       .insert(report)
       .values({
         projectId: proj.id,
-        userId: proj.userId,
+        userId: proj.userId ?? "",
         name: "Final Report",
       })
       .returning({ id: report.id });

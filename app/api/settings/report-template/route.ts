@@ -4,6 +4,7 @@ import { getStorage } from "@/lib/storage";
 import { db } from "@/db/client";
 import { reportTemplate } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { requireOrgRole } from "@/lib/org-access";
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -25,7 +26,7 @@ export async function GET(_req: NextRequest) {
       uploadedAt: reportTemplate.uploadedAt,
     })
     .from(reportTemplate)
-    .where(eq(reportTemplate.userId, session!.user.id))
+    .where(eq(reportTemplate.organizationId, session!.user.orgId))
     .orderBy(desc(reportTemplate.uploadedAt));
 
   return NextResponse.json(rows);
@@ -52,12 +53,17 @@ export async function POST(request: NextRequest) {
   }
 
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const blobKey = `templates/${session!.user.id}/${Date.now()}-${safeName}`;
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const blobKey = `templates/${session!.user.orgId}/${Date.now()}-${safeName}`;
   const blob = await getStorage().put(blobKey, Buffer.from(await file.arrayBuffer()), file.type);
 
   const [row] = await db
     .insert(reportTemplate)
     .values({
+      organizationId: session!.user.orgId,
       userId: session!.user.id,
       name: file.name,
       blobUrl: blob.url,

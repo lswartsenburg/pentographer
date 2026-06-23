@@ -12,6 +12,7 @@ import {
   IconLogout,
   IconChevronDown,
   IconTemplate,
+  IconUsers,
 } from "@tabler/icons-react";
 import {
   Sidebar,
@@ -43,13 +44,17 @@ const resourcesNav = [
   { href: "/customers", label: "Customers", icon: IconBuilding },
 ];
 
-const accountNav = [{ href: "/settings", label: "Settings", icon: IconSettings }];
+const accountNav = [
+  { href: "/settings", label: "Settings", icon: IconSettings },
+  { href: "/settings/team", label: "Team", icon: IconUsers },
+];
 
 interface AppSidebarProps {
   user: {
     name?: string | null;
     email?: string | null;
   };
+  orgName?: string | null;
 }
 
 function getInitials(name?: string | null, email?: string | null): string {
@@ -65,7 +70,7 @@ function getInitials(name?: string | null, email?: string | null): string {
   return "?";
 }
 
-export function AppSidebar({ user }: AppSidebarProps) {
+export function AppSidebar({ user, orgName }: AppSidebarProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
@@ -142,7 +147,9 @@ export function AppSidebar({ user }: AppSidebarProps) {
                     <span className="truncate text-xs font-medium text-sidebar-foreground">
                       {user.name ?? "User"}
                     </span>
-                    <span className="truncate text-[11px] text-muted-foreground">{user.email}</span>
+                    <span className="truncate text-[11px] text-muted-foreground">
+                      {orgName ?? user.email}
+                    </span>
                   </div>
                   <IconChevronDown size={14} className="ml-auto text-muted-foreground" />
                 </SidebarMenuButton>

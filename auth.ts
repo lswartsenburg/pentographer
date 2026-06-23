@@ -4,7 +4,7 @@ import { compare } from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { userAccount } from "@/db/schema";
+import { userAccount, organizationMember } from "@/db/schema";
 import { authConfig } from "./auth.config";
 
 if (!process.env.AUTH_SECRET && !process.env.NEXTAUTH_SECRET) {
@@ -50,12 +50,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        const [member] = await db
+          .select({ orgId: organizationMember.organizationId })
+          .from(organizationMember)
+          .where(eq(organizationMember.userId, user.id as string))
+          .limit(1);
+        token.orgId = member?.orgId ?? null;
       }
       return token;
     },
     async session({ session, token }) {
       if (token.id) {
         session.user.id = token.id as string;
+      }
+      if (token.orgId) {
+        session.user.orgId = token.orgId as string;
       }
       return session;
     },

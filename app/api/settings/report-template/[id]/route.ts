@@ -5,6 +5,7 @@ import { getStorage } from "@/lib/storage";
 import { db } from "@/db/client";
 import { reportTemplate } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { requireOrgRole } from "@/lib/org-access";
 
 const patchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -15,11 +16,11 @@ const patchSchema = z.object({
   isPublic: z.boolean().optional(),
 });
 
-async function getOwnedTemplate(userId: string, templateId: string) {
+async function getOrgTemplate(orgId: string, templateId: string) {
   const [row] = await db
     .select()
     .from(reportTemplate)
-    .where(and(eq(reportTemplate.id, templateId), eq(reportTemplate.userId, userId)))
+    .where(and(eq(reportTemplate.id, templateId), eq(reportTemplate.organizationId, orgId)))
     .limit(1);
   return row ?? null;
 }
@@ -41,7 +42,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (error) return error;
   const { id: templateId } = await params;
 
-  const tmpl = await getOwnedTemplate(session!.user.id, templateId);
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const tmpl = await getOrgTemplate(session!.user.orgId, templateId);
   if (!tmpl) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let body: unknown;
@@ -78,7 +83,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (error) return error;
   const { id: templateId } = await params;
 
-  const tmpl = await getOwnedTemplate(session!.user.id, templateId);
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const tmpl = await getOrgTemplate(session!.user.orgId, templateId);
   if (!tmpl) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await getStorage().del(tmpl.blobUrl);

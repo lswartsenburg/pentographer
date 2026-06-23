@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { customer } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { requireOrgRole } from "@/lib/org-access";
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),
@@ -17,7 +18,7 @@ export async function GET() {
   const rows = await db
     .select()
     .from(customer)
-    .where(eq(customer.userId, session!.user.id))
+    .where(eq(customer.organizationId, session!.user.orgId))
     .orderBy(desc(customer.createdAt));
 
   return NextResponse.json(rows);
@@ -26,6 +27,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const { session, error } = await requireAuth();
   if (error) return error;
+
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   let body: unknown;
   try {
@@ -42,6 +47,7 @@ export async function POST(request: NextRequest) {
   const [created] = await db
     .insert(customer)
     .values({
+      organizationId: session!.user.orgId,
       userId: session!.user.id,
       name: parsed.data.name.trim(),
       contactEmail: parsed.data.contactEmail ?? null,
