@@ -32,7 +32,7 @@ async function seed() {
 
     const [org] = await tx
       .insert(organization)
-      .values({ name: "CI Test User's Workspace" })
+      .values({ name: "CI Test User's Organization" })
       .returning();
 
     await tx
