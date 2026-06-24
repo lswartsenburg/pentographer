@@ -85,6 +85,7 @@ export function ReportVersionEditor({
   const [status, setStatus] = useState(initialStatus);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [publishWarningOpen, setPublishWarningOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState<"draft" | "review" | null>(null);
   const [review, setReview] = useState<{
     clarity: string;
@@ -159,7 +160,17 @@ export function ReportVersionEditor({
     router.refresh();
   }
 
+  function handlePublishClick() {
+    const draftCount = findings.filter((f) => includedIds.has(f.id) && f.status === "draft").length;
+    if (draftCount > 0) {
+      setPublishWarningOpen(true);
+    } else {
+      handlePublish();
+    }
+  }
+
   async function handlePublish() {
+    setPublishWarningOpen(false);
     setPublishing(true);
     const res = await fetch(`${apiBase}/publish`, { method: "POST" });
     setPublishing(false);
@@ -311,7 +322,7 @@ export function ReportVersionEditor({
               <Button size="sm" variant="outline" onClick={handleSave} disabled={saving}>
                 {saving ? "Saving…" : "Save"}
               </Button>
-              <Button size="sm" onClick={handlePublish} disabled={publishing}>
+              <Button size="sm" onClick={handlePublishClick} disabled={publishing}>
                 {publishing ? (
                   <IconLoader2 size={13} className="animate-spin" />
                 ) : (
@@ -388,6 +399,31 @@ export function ReportVersionEditor({
                 Download
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Draft findings publish warning */}
+      <Dialog open={publishWarningOpen} onOpenChange={setPublishWarningOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Publish with draft findings?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {findings.filter((f) => includedIds.has(f.id) && f.status === "draft").length} included{" "}
+            {findings.filter((f) => includedIds.has(f.id) && f.status === "draft").length === 1
+              ? "finding is"
+              : "findings are"}{" "}
+            still in <strong>Draft</strong> status. Published reports typically contain only
+            confirmed findings. You can still publish, but consider reviewing these first.
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={() => setPublishWarningOpen(false)}>
+              Go back
+            </Button>
+            <Button size="sm" onClick={handlePublish} disabled={publishing}>
+              Publish anyway
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

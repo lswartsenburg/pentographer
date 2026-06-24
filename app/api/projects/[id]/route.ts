@@ -23,6 +23,7 @@ const updateSchema = z.object({
   startDate: z.string().datetime({ offset: true }).nullable().optional(),
   endDate: z.string().datetime({ offset: true }).nullable().optional(),
   statusJustification: z.string().optional(),
+  playbookVersionId: z.string().uuid().nullable().optional(),
 });
 
 const BACKWARD_STATUSES: Record<string, string[]> = {
@@ -147,6 +148,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updateData.startDate = parsed.data.startDate ? new Date(parsed.data.startDate) : null;
   if (parsed.data.endDate !== undefined)
     updateData.endDate = parsed.data.endDate ? new Date(parsed.data.endDate) : null;
+  if (parsed.data.playbookVersionId !== undefined)
+    updateData.playbookVersionId = parsed.data.playbookVersionId;
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ ...row, testAccounts: decryptAccounts(row.testAccounts) });
+  }
 
   const [updated] = await db.update(project).set(updateData).where(eq(project.id, id)).returning();
 

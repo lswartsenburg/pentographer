@@ -36,7 +36,7 @@ async function loginUser(page: Page, email: string, password: string): Promise<v
 test.describe("Organization — happy paths", () => {
   test("registration creates a personal org and the user is an owner", async ({ browser }) => {
     const email = uniqueEmail();
-    const ctx = await browser.newContext();
+    const ctx = await browser.newContext({ storageState: undefined });
     const page = await ctx.newPage();
 
     await registerUser(page, "Org Happy User", email, "securePassword123");
@@ -57,7 +57,7 @@ test.describe("Organization — happy paths", () => {
     const memberEmail = uniqueEmail();
     const password = "securePassword123";
 
-    const ownerCtx = await browser.newContext();
+    const ownerCtx = await browser.newContext({ storageState: undefined });
     const ownerPage = await ownerCtx.newPage();
 
     await registerUser(ownerPage, "Org Owner", ownerEmail, password);
@@ -84,7 +84,7 @@ test.describe("Organization — happy paths", () => {
     const memberEmail = uniqueEmail();
     const password = "securePassword123";
 
-    const ownerCtx = await browser.newContext();
+    const ownerCtx = await browser.newContext({ storageState: undefined });
     const ownerPage = await ownerCtx.newPage();
 
     await registerUser(ownerPage, "Resource Owner", ownerEmail, password);
@@ -103,7 +103,7 @@ test.describe("Organization — happy paths", () => {
     expect(custRes.ok()).toBe(true);
 
     // Member logs in and should see the customer
-    const memberCtx = await browser.newContext();
+    const memberCtx = await browser.newContext({ storageState: undefined });
     const memberPage = await memberCtx.newPage();
     await loginUser(memberPage, memberEmail, password);
 
@@ -121,7 +121,7 @@ test.describe("Organization — happy paths", () => {
     const memberEmail = uniqueEmail();
     const password = "securePassword123";
 
-    const ownerCtx = await browser.newContext();
+    const ownerCtx = await browser.newContext({ storageState: undefined });
     const ownerPage = await ownerCtx.newPage();
 
     await registerUser(ownerPage, "Remove Owner", ownerEmail, password);
@@ -151,7 +151,7 @@ test.describe("Organization — happy paths", () => {
     const memberEmail = uniqueEmail();
     const password = "securePassword123";
 
-    const ownerCtx = await browser.newContext();
+    const ownerCtx = await browser.newContext({ storageState: undefined });
     const ownerPage = await ownerCtx.newPage();
 
     await registerUser(ownerPage, "Role Owner", ownerEmail, password);
@@ -182,7 +182,7 @@ test.describe("Organization — unhappy paths", () => {
     const viewerEmail = uniqueEmail();
     const password = "securePassword123";
 
-    const ownerCtx = await browser.newContext();
+    const ownerCtx = await browser.newContext({ storageState: undefined });
     const ownerPage = await ownerCtx.newPage();
 
     await registerUser(ownerPage, "Viewer Owner", ownerEmail, password);
@@ -194,7 +194,7 @@ test.describe("Organization — unhappy paths", () => {
     });
     expect(addRes.ok()).toBe(true);
 
-    const viewerCtx = await browser.newContext();
+    const viewerCtx = await browser.newContext({ storageState: undefined });
     const viewerPage = await viewerCtx.newPage();
     await loginUser(viewerPage, viewerEmail, password);
 
@@ -213,7 +213,7 @@ test.describe("Organization — unhappy paths", () => {
     const targetEmail = uniqueEmail();
     const password = "securePassword123";
 
-    const ownerCtx = await browser.newContext();
+    const ownerCtx = await browser.newContext({ storageState: undefined });
     const ownerPage = await ownerCtx.newPage();
 
     await registerUser(ownerPage, "Mgmt Owner", ownerEmail, password);
@@ -225,7 +225,7 @@ test.describe("Organization — unhappy paths", () => {
       data: { email: memberEmail, role: "member" },
     });
 
-    const memberCtx = await browser.newContext();
+    const memberCtx = await browser.newContext({ storageState: undefined });
     const memberPage = await memberCtx.newPage();
     await loginUser(memberPage, memberEmail, password);
 
@@ -243,7 +243,7 @@ test.describe("Organization — unhappy paths", () => {
     const orgBEmail = uniqueEmail();
     const password = "securePassword123";
 
-    const orgACtx = await browser.newContext();
+    const orgACtx = await browser.newContext({ storageState: undefined });
     const orgAPage = await orgACtx.newPage();
     await registerUser(orgAPage, "Org A User", orgAEmail, password);
     await loginUser(orgAPage, orgAEmail, password);
@@ -253,7 +253,7 @@ test.describe("Organization — unhappy paths", () => {
     });
     const orgACust = await custRes.json();
 
-    const orgBCtx = await browser.newContext();
+    const orgBCtx = await browser.newContext({ storageState: undefined });
     const orgBPage = await orgBCtx.newPage();
     await registerUser(orgBPage, "Org B User", orgBEmail, password);
     await loginUser(orgBPage, orgBEmail, password);
@@ -270,7 +270,7 @@ test.describe("Organization — unhappy paths", () => {
     const ownerEmail = uniqueEmail();
     const password = "securePassword123";
 
-    const ownerCtx = await browser.newContext();
+    const ownerCtx = await browser.newContext({ storageState: undefined });
     const ownerPage = await ownerCtx.newPage();
     await registerUser(ownerPage, "Add Owner", ownerEmail, password);
     await loginUser(ownerPage, ownerEmail, password);
@@ -287,7 +287,7 @@ test.describe("Organization — unhappy paths", () => {
     const ownerEmail = uniqueEmail();
     const password = "securePassword123";
 
-    const ownerCtx = await browser.newContext();
+    const ownerCtx = await browser.newContext({ storageState: undefined });
     const ownerPage = await ownerCtx.newPage();
     await registerUser(ownerPage, "Sole Owner", ownerEmail, password);
     await loginUser(ownerPage, ownerEmail, password);

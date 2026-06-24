@@ -22,7 +22,7 @@ export default async function CustomersPage() {
     })
     .from(customer)
     .leftJoin(project, eq(project.customerId, customer.id))
-    .where(eq(customer.userId, session.user.id))
+    .where(eq(customer.organizationId, session.user.orgId))
     .groupBy(customer.id)
     .orderBy(desc(customer.createdAt));
 

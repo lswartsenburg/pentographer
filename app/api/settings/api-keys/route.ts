@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { apiKey } from "@/db/schema";
+import { apiKey, userAccount } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
 import { getOrgRole } from "@/lib/org-access";
 
@@ -23,8 +23,10 @@ export async function GET() {
       lastUsedAt: apiKey.lastUsedAt,
       expiresAt: apiKey.expiresAt,
       userId: apiKey.userId,
+      createdByName: userAccount.name,
     })
     .from(apiKey)
+    .leftJoin(userAccount, eq(apiKey.userId, userAccount.id))
     .where(
       isAdmin
         ? eq(apiKey.organizationId, session!.user.orgId)

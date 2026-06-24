@@ -47,6 +47,7 @@ export const orgRoleEnum = pgEnum("org_role", ["owner", "admin", "member", "view
 export const organization = pgTable("organization", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  anthropicApiKey: text("anthropic_api_key"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -97,7 +98,8 @@ export const userAccount = pgTable("user_account", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  organizationName: text("organization_name"),
+  companyName: text("company_name"),
+  anthropicApiKey: text("anthropic_api_key"),
   // Points to the user's personal org — set on registration and during migration backfill
   personalOrgId: uuid("personal_org_id").references(() => organization.id, {
     onDelete: "set null",
@@ -281,6 +283,7 @@ export const reportTemplate = pgTable("report_template", {
   publishNotes: text("publish_notes"),
   blobUrl: text("blob_url").notNull(),
   isPublic: boolean("is_public").notNull().default(false),
+  isDefault: boolean("is_default").notNull().default(false),
   downloadCount: integer("download_count").notNull().default(0),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 });
@@ -312,6 +315,13 @@ export const apiKey = pgTable("api_key", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   lastUsedAt: timestamp("last_used_at"),
   expiresAt: timestamp("expires_at"),
+});
+
+export const aiUsageLog = pgTable("ai_usage_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => userAccount.id, { onDelete: "set null" }),
+  orgId: uuid("org_id").references(() => organization.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const oauthClient = pgTable("oauth_client", {

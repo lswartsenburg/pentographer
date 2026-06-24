@@ -8,6 +8,7 @@ import { TeamMembersCard } from "./team-members-card";
 export default async function TeamSettingsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+  if (!session.user.orgId) redirect("/login");
 
   const orgId = session.user.orgId;
 
@@ -36,7 +37,7 @@ export default async function TeamSettingsPage() {
   return (
     <div className="flex flex-col h-full">
       <header className="flex items-center border-b border-border h-12 px-5 bg-background">
-        <h1 className="text-sm font-medium text-foreground">Team</h1>
+        <h1 className="text-sm font-medium text-foreground">Members</h1>
       </header>
       <div className="flex-1 p-5 space-y-6">
         <TeamMembersCard

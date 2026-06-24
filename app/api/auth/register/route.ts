@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       .values({ name: name.trim(), email: email.toLowerCase(), passwordHash })
       .returning({ id: userAccount.id, name: userAccount.name });
 
-    const orgName = `${user.name}'s Workspace`;
+    const orgName = `${user.name}'s Organization`;
     const [org] = await tx
       .insert(organization)
       .values({ name: orgName })

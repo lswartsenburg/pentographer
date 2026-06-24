@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getStorage } from "@/lib/storage";
 import { db } from "@/db/client";
@@ -14,6 +14,7 @@ const patchSchema = z.object({
   language: z.string().max(100).nullable().optional(),
   publishNotes: z.string().max(1000).nullable().optional(),
   isPublic: z.boolean().optional(),
+  isDefault: z.boolean().optional(),
 });
 
 async function getOrgTemplate(orgId: string, templateId: string) {
@@ -33,6 +34,7 @@ const templateFields = {
   language: reportTemplate.language,
   publishNotes: reportTemplate.publishNotes,
   isPublic: reportTemplate.isPublic,
+  isDefault: reportTemplate.isDefault,
   downloadCount: reportTemplate.downloadCount,
   uploadedAt: reportTemplate.uploadedAt,
 } as const;
@@ -68,6 +70,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (parsed.data.language !== undefined) updates.language = parsed.data.language;
   if (parsed.data.publishNotes !== undefined) updates.publishNotes = parsed.data.publishNotes;
   if (parsed.data.isPublic !== undefined) updates.isPublic = parsed.data.isPublic;
+  if (parsed.data.isDefault !== undefined) {
+    if (parsed.data.isDefault) {
+      // Clear default from all other templates in this org first
+      await db
+        .update(reportTemplate)
+        .set({ isDefault: false })
+        .where(
+          and(
+            eq(reportTemplate.organizationId, session!.user.orgId),
+            ne(reportTemplate.id, templateId)
+          )
+        );
+    }
+    updates.isDefault = parsed.data.isDefault;
+  }
 
   const [updated] = await db
     .update(reportTemplate)

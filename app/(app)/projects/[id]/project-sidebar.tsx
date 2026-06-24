@@ -6,8 +6,22 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { IconPlus, IconX, IconEye, IconEyeOff, IconPencil } from "@tabler/icons-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  IconPlus,
+  IconX,
+  IconEye,
+  IconEyeOff,
+  IconPencil,
+  IconChevronDown,
+} from "@tabler/icons-react";
 
 interface TestAccount {
   role: string;
@@ -15,10 +29,17 @@ interface TestAccount {
   password?: string;
 }
 
+interface PlaybookOption {
+  id: string;
+  playbookName: string;
+  version: string;
+}
+
 interface ProjectSidebarProps {
   projectId: string;
   status: string;
   customerName: string | null;
+  playbookVersionId: string | null;
   playbookName: string | null;
   playbookVersion: string | null;
   scope: string | null;
@@ -43,12 +64,22 @@ const STATUS_LABELS: Record<string, string> = {
   complete: "Complete",
 };
 
+// Statuses that require a justification when transitioning to them
+const BACKWARD_STATUSES: Record<string, string[]> = {
+  complete: ["in_progress", "under_review"],
+  under_review: ["in_progress"],
+};
+
+const STATUS_ORDER = ["in_progress", "under_review", "complete"] as const;
+type ProjectStatus = (typeof STATUS_ORDER)[number];
+
 export function ProjectSidebar({
   projectId,
   status,
   customerName,
-  playbookName,
-  playbookVersion,
+  playbookVersionId: initialPlaybookVersionId,
+  playbookName: initialPlaybookName,
+  playbookVersion: initialPlaybookVersion,
   scope,
   applicationUrl: initialApplicationUrl,
   testAccounts: initialTestAccounts,
@@ -61,6 +92,101 @@ export function ProjectSidebar({
   const router = useRouter();
   const [applicationUrl, setApplicationUrl] = useState(initialApplicationUrl ?? "");
   const [saving, setSaving] = useState(false);
+
+  // Playbook change state
+  const [playbookVersionId, setPlaybookVersionId] = useState(initialPlaybookVersionId);
+  const [playbookName, setPlaybookName] = useState(initialPlaybookName);
+  const [playbookVersion, setPlaybookVersion] = useState(initialPlaybookVersion);
+  const [changingPlaybook, setChangingPlaybook] = useState(false);
+  const [playbookOptions, setPlaybookOptions] = useState<PlaybookOption[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState(initialPlaybookVersionId ?? "");
+  const [savingPlaybook, setSavingPlaybook] = useState(false);
+
+  async function openPlaybookChange() {
+    const res = await fetch("/api/playbooks");
+    if (res.ok) {
+      const pbs: Array<{
+        id: string;
+        name: string;
+        latestVersion: { id: string; version: string } | null;
+      }> = await res.json();
+      setPlaybookOptions(
+        pbs
+          .filter((pb) => pb.latestVersion)
+          .map((pb) => ({
+            id: pb.latestVersion!.id,
+            playbookName: pb.name,
+            version: pb.latestVersion!.version,
+          }))
+      );
+    }
+    setSelectedVersionId(playbookVersionId ?? "");
+    setChangingPlaybook(true);
+  }
+
+  async function savePlaybook() {
+    setSavingPlaybook(true);
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playbookVersionId: selectedVersionId || null }),
+    });
+    setSavingPlaybook(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error ?? "Failed to update playbook.");
+      return;
+    }
+    const chosen = playbookOptions.find((o) => o.id === selectedVersionId);
+    setPlaybookVersionId(selectedVersionId || null);
+    setPlaybookName(chosen?.playbookName ?? null);
+    setPlaybookVersion(chosen?.version ?? null);
+    setChangingPlaybook(false);
+    toast.success("Playbook updated.");
+    router.refresh();
+  }
+
+  // Status transition state
+  const [currentStatus, setCurrentStatus] = useState<ProjectStatus>(status as ProjectStatus);
+  const [justificationOpen, setJustificationOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<ProjectStatus | null>(null);
+  const [justification, setJustification] = useState("");
+  const [changingStatus, setChangingStatus] = useState(false);
+
+  const availableTransitions = STATUS_ORDER.filter((s) => s !== currentStatus);
+
+  function handleStatusSelect(next: ProjectStatus) {
+    const isBackward = BACKWARD_STATUSES[currentStatus]?.includes(next);
+    if (isBackward) {
+      setPendingStatus(next);
+      setJustification("");
+      setJustificationOpen(true);
+    } else {
+      applyStatusChange(next);
+    }
+  }
+
+  async function applyStatusChange(next: ProjectStatus, statusJustification?: string) {
+    setChangingStatus(true);
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: next,
+        ...(statusJustification ? { statusJustification } : {}),
+      }),
+    });
+    setChangingStatus(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error ?? "Failed to change status.");
+      return;
+    }
+    setCurrentStatus(next);
+    setJustificationOpen(false);
+    toast.success(`Status changed to ${STATUS_LABELS[next]}.`);
+    router.refresh();
+  }
 
   // Test accounts dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -158,24 +284,91 @@ export function ProjectSidebar({
     <>
       <div className="w-64 shrink-0 bg-background border-r border-border overflow-y-auto p-4">
         <div className="space-y-3 text-sm">
-          {/* Static metadata */}
+          {/* Status with transition dropdown */}
           <div>
             <p className="text-[11px] text-muted-foreground mb-0.5">Status</p>
-            <span
-              className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_STYLES[status] ?? "bg-muted text-muted-foreground"}`}
-            >
-              {STATUS_LABELS[status] ?? status}
-            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_STYLES[currentStatus] ?? "bg-muted text-muted-foreground"} hover:opacity-80 transition-opacity`}
+                  disabled={changingStatus}
+                >
+                  {STATUS_LABELS[currentStatus] ?? currentStatus}
+                  <IconChevronDown size={10} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                {availableTransitions.map((s) => {
+                  const isBackward = BACKWARD_STATUSES[currentStatus]?.includes(s);
+                  return (
+                    <DropdownMenuItem key={s} onClick={() => handleStatusSelect(s)}>
+                      <span
+                        className={`mr-1.5 inline-block w-1.5 h-1.5 rounded-full ${STATUS_STYLES[s].split(" ")[0]}`}
+                      />
+                      {STATUS_LABELS[s]}
+                      {isBackward && (
+                        <span className="ml-auto text-[10px] text-muted-foreground">
+                          ↩ requires note
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <div>
             <p className="text-[11px] text-muted-foreground mb-0.5">Customer</p>
             <p className="text-foreground font-medium">{customerName ?? "—"}</p>
           </div>
           <div>
-            <p className="text-[11px] text-muted-foreground mb-0.5">Playbook</p>
-            <p className="text-foreground">
-              {playbookName ? `${playbookName} — v${playbookVersion}` : "—"}
-            </p>
+            <div className="flex items-center justify-between mb-0.5">
+              <p className="text-[11px] text-muted-foreground">Playbook</p>
+              {!changingPlaybook && (
+                <button
+                  onClick={openPlaybookChange}
+                  className="flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-foreground"
+                >
+                  <IconPencil size={11} />
+                  Change
+                </button>
+              )}
+            </div>
+            {changingPlaybook ? (
+              <div className="space-y-1.5">
+                <select
+                  value={selectedVersionId}
+                  onChange={(e) => setSelectedVersionId(e.target.value)}
+                  className="w-full h-7 px-2 rounded-md border border-border bg-background text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+                >
+                  <option value="">No playbook</option>
+                  {playbookOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.playbookName} — v{o.version}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={savePlaybook}
+                    disabled={savingPlaybook}
+                    className="text-[11px] text-primary hover:underline disabled:opacity-50"
+                  >
+                    {savingPlaybook ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setChangingPlaybook(false)}
+                    className="text-[11px] text-muted-foreground hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-foreground text-sm">
+                {playbookName ? `${playbookName} — v${playbookVersion}` : "—"}
+              </p>
+            )}
           </div>
           {scope && (
             <div>
@@ -268,6 +461,38 @@ export function ProjectSidebar({
           </div>
         </div>
       </div>
+
+      {/* Status backward justification dialog */}
+      <Dialog open={justificationOpen} onOpenChange={setJustificationOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Justify status change</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Moving back to <strong>{pendingStatus ? STATUS_LABELS[pendingStatus] : ""}</strong>{" "}
+            requires a justification.
+          </p>
+          <Textarea
+            value={justification}
+            onChange={(e) => setJustification(e.target.value)}
+            placeholder="Explain why the status is being reversed…"
+            className="h-24 text-sm"
+            autoFocus
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={() => setJustificationOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!justification.trim() || changingStatus}
+              onClick={() => pendingStatus && applyStatusChange(pendingStatus, justification)}
+            >
+              {changingStatus ? "Saving…" : "Confirm"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Test accounts dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -4,7 +4,7 @@ import { compare } from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { userAccount, organizationMember } from "@/db/schema";
+import { userAccount } from "@/db/schema";
 import { authConfig } from "./auth.config";
 
 if (!process.env.AUTH_SECRET && !process.env.NEXTAUTH_SECRET) {
@@ -47,15 +47,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      if (trigger === "update" && (session as { orgId?: string } | null)?.orgId) {
+        token.orgId = (session as { orgId: string }).orgId;
+      }
       if (user) {
         token.id = user.id;
-        const [member] = await db
-          .select({ orgId: organizationMember.organizationId })
-          .from(organizationMember)
-          .where(eq(organizationMember.userId, user.id as string))
+      }
+      // Fetch orgId on sign-in or when missing from an existing token (legacy sessions)
+      if (user || (token.id && !token.orgId)) {
+        const userId = (user?.id ?? token.id) as string;
+        const [row] = await db
+          .select({ orgId: userAccount.personalOrgId })
+          .from(userAccount)
+          .where(eq(userAccount.id, userId))
           .limit(1);
-        token.orgId = member?.orgId ?? null;
+        token.orgId = row?.orgId ?? null;
       }
       return token;
     },

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { db } from "@/db/client";
 import { customer, project } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { CustomerActions } from "./customer-actions";
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
@@ -34,7 +35,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const [c] = await db
     .select()
     .from(customer)
-    .where(and(eq(customer.id, id), eq(customer.userId, session.user.id)))
+    .where(and(eq(customer.id, id), eq(customer.organizationId, session.user.orgId)))
     .limit(1);
 
   if (!c) notFound();
@@ -47,7 +48,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center gap-2 border-b border-border h-12 px-5 bg-background">
+      <header className="flex items-center justify-between border-b border-border h-12 px-5 bg-background">
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Link href="/customers" className="hover:text-foreground">
             Customers
@@ -55,6 +56,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <span>/</span>
           <span className="text-foreground font-medium">{c.name}</span>
         </nav>
+        <CustomerActions
+          customerId={c.id}
+          currentName={c.name}
+          currentEmail={c.contactEmail ?? null}
+        />
       </header>
 
       <div className="flex-1 p-5 space-y-4 max-w-3xl">

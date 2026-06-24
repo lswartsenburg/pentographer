@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 // These tests run without a saved session — they test the auth flows themselves.
-test.use({ storageState: undefined });
+test.use({ storageState: { cookies: [], origins: [] } });
 
 function uniqueEmail() {
   return `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@test.invalid`;
@@ -11,9 +11,10 @@ test.describe("Registration", () => {
   test("registers with valid credentials and lands on /dashboard", async ({ page }) => {
     const email = uniqueEmail();
     await page.goto("/register");
-    await page.getByLabel("Name").fill("E2E Test User");
+    await page.getByLabel("Full name").fill("E2E Test User");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill("securePassword123");
+    await page.getByLabel("Password", { exact: true }).fill("securePassword123");
+    await page.getByLabel("Confirm password").fill("securePassword123");
     await page.getByRole("button", { name: /register|sign up|create account/i }).click();
 
     await expect(page).toHaveURL(/\/(login|dashboard)/, { timeout: 10_000 });
@@ -24,17 +25,19 @@ test.describe("Registration", () => {
 
     // Register first time
     await page.goto("/register");
-    await page.getByLabel("Name").fill("First User");
+    await page.getByLabel("Full name").fill("First User");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill("securePassword123");
+    await page.getByLabel("Password", { exact: true }).fill("securePassword123");
+    await page.getByLabel("Confirm password").fill("securePassword123");
     await page.getByRole("button", { name: /register|sign up|create account/i }).click();
     await expect(page).toHaveURL(/\/(login|dashboard)/, { timeout: 10_000 });
 
     // Register second time with same email
     await page.goto("/register");
-    await page.getByLabel("Name").fill("Second User");
+    await page.getByLabel("Full name").fill("Second User");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill("securePassword123");
+    await page.getByLabel("Password", { exact: true }).fill("securePassword123");
+    await page.getByLabel("Confirm password").fill("securePassword123");
     await page.getByRole("button", { name: /register|sign up|create account/i }).click();
 
     await expect(page.getByText(/failed|already|exists|duplicate/i)).toBeVisible({
@@ -44,9 +47,10 @@ test.describe("Registration", () => {
 
   test("shows validation error for short password", async ({ page }) => {
     await page.goto("/register");
-    await page.getByLabel("Name").fill("Test User");
+    await page.getByLabel("Full name").fill("Test User");
     await page.getByLabel("Email").fill(uniqueEmail());
-    await page.getByLabel("Password").fill("short");
+    await page.getByLabel("Password", { exact: true }).fill("short");
+    await page.getByLabel("Confirm password").fill("short");
     await page.getByRole("button", { name: /register|sign up|create account/i }).click();
 
     // Should either show a form error or stay on the register page
@@ -64,13 +68,14 @@ test.describe("Login", () => {
 
   test.beforeAll(async ({ browser }) => {
     testEmail = uniqueEmail();
-    const ctx = await browser.newContext();
+    const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await ctx.newPage();
     // Register the account we'll use for login tests
     await page.goto("http://localhost:3000/register");
-    await page.getByLabel("Name").fill("Login Test User");
+    await page.getByLabel("Full name").fill("Login Test User");
     await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill(testPassword);
+    await page.getByLabel("Password", { exact: true }).fill(testPassword);
+    await page.getByLabel("Confirm password").fill(testPassword);
     await page.getByRole("button", { name: /register|sign up|create account/i }).click();
     await page.waitForURL(/\/(login|dashboard)/, { timeout: 10_000 });
     await ctx.close();
@@ -118,16 +123,10 @@ test.describe("Login", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
 
-    // Open user menu and sign out
-    await page
-      .getByRole("button", { name: /sign out|log out|logout/i })
-      .click()
-      .catch(async () => {
-        // May be in a dropdown — open it first
-        const trigger = page.locator("[data-sidebar='menu-button']").last();
-        await trigger.click();
-        await page.getByText(/sign out/i).click();
-      });
+    // Open the user menu at the bottom of the sidebar and sign out.
+    const userMenuTrigger = page.locator("[data-sidebar='menu-button']").last();
+    await userMenuTrigger.click();
+    await page.getByRole("menuitem", { name: /sign out/i }).click();
 
     await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
 

@@ -108,7 +108,7 @@ export function TeamMembersCard({
       <div>
         <h2 className="text-sm font-medium text-foreground">{orgName}</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Manage who has access to your workspace
+          Manage who has access to your organization
         </p>
       </div>
 
@@ -176,30 +176,25 @@ export function TeamMembersCard({
       </div>
 
       {manage && (
-        <form onSubmit={handleAdd} className="flex items-end gap-3 pt-2">
-          <div className="space-y-1.5 flex-1">
-            <Label htmlFor="add-email" className="text-xs">
-              Add by email
-            </Label>
+        <form onSubmit={handleAdd} className="pt-2 space-y-1.5">
+          <Label htmlFor="add-email" className="text-xs">
+            Add by email
+          </Label>
+          <div className="flex items-center gap-3">
             <Input
               id="add-email"
               type="email"
               placeholder="colleague@example.com"
               value={addEmail}
               onChange={(e) => setAddEmail(e.target.value)}
-              className="h-8 text-sm"
+              className="flex-1 h-8 text-sm"
               required
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="add-role" className="text-xs">
-              Role
-            </Label>
             <Select
               value={addRole}
               onValueChange={(v) => setAddRole(v as "admin" | "member" | "viewer")}
             >
-              <SelectTrigger id="add-role" className="h-8 text-sm w-28">
+              <SelectTrigger className="h-8 text-sm w-28">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -208,10 +203,10 @@ export function TeamMembersCard({
                 <SelectItem value="viewer">Viewer</SelectItem>
               </SelectContent>
             </Select>
+            <Button type="submit" size="sm" className="h-8" disabled={adding}>
+              {adding ? "Adding…" : "Add"}
+            </Button>
           </div>
-          <Button type="submit" size="sm" className="h-8" disabled={adding}>
-            {adding ? "Adding…" : "Add"}
-          </Button>
         </form>
       )}
     </div>

@@ -22,6 +22,7 @@ export async function GET(_req: NextRequest) {
       language: reportTemplate.language,
       publishNotes: reportTemplate.publishNotes,
       isPublic: reportTemplate.isPublic,
+      isDefault: reportTemplate.isDefault,
       downloadCount: reportTemplate.downloadCount,
       uploadedAt: reportTemplate.uploadedAt,
     })
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
       language: reportTemplate.language,
       publishNotes: reportTemplate.publishNotes,
       isPublic: reportTemplate.isPublic,
+      isDefault: reportTemplate.isDefault,
       downloadCount: reportTemplate.downloadCount,
       uploadedAt: reportTemplate.uploadedAt,
     });

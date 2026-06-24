@@ -10,13 +10,13 @@ interface User {
   id: string;
   name: string;
   email: string;
-  organizationName: string | null;
+  companyName: string | null;
 }
 
 export function SettingsForm({ user }: { user: User }) {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
-  const [organizationName, setOrganizationName] = useState(user.organizationName ?? "");
+  const [companyName, setOrganizationName] = useState(user.companyName ?? "");
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -31,7 +31,7 @@ export function SettingsForm({ user }: { user: User }) {
     const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, organizationName: organizationName || null }),
+      body: JSON.stringify({ name, email, companyName: companyName || null }),
     });
 
     setSavingProfile(false);
@@ -101,10 +101,10 @@ export function SettingsForm({ user }: { user: User }) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="organizationName">Organization name</Label>
+            <Label htmlFor="companyName">Company name</Label>
             <Input
-              id="organizationName"
-              value={organizationName}
+              id="companyName"
+              value={companyName}
               onChange={(e) => setOrganizationName(e.target.value)}
               placeholder="e.g. Acme Security"
             />

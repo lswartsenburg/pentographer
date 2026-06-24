@@ -76,14 +76,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "User is already a member" }, { status: 409 });
   }
 
-  const [created] = await db
-    .insert(organizationMember)
-    .values({
-      organizationId: session!.user.orgId,
-      userId: targetUser.id,
-      role: parsed.data.role,
-    })
-    .returning();
+  const [created] = await db.transaction(async (tx) => {
+    const [membership] = await tx
+      .insert(organizationMember)
+      .values({
+        organizationId: session!.user.orgId,
+        userId: targetUser.id,
+        role: parsed.data.role,
+      })
+      .returning();
+
+    // Move the invited user into this org so their next login is scoped here.
+    await tx
+      .update(userAccount)
+      .set({ personalOrgId: session!.user.orgId })
+      .where(eq(userAccount.id, targetUser.id));
+
+    return [membership];
+  });
 
   return NextResponse.json(created, { status: 201 });
 }

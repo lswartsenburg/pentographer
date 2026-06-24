@@ -56,7 +56,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!proj) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const [user] = await db
-    .select({ organizationName: userAccount.organizationName })
+    .select({ companyName: userAccount.companyName })
     .from(userAccount)
     .where(eq(userAccount.id, session!.user.id))
     .limit(1);
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             : {}),
         }))
       : null,
-    organizationName: user?.organizationName ?? null,
+    companyName: user?.companyName ?? null,
     startDate: null,
     endDate: null,
     execSummary,
