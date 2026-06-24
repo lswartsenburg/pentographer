@@ -1,14 +1,16 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db/client";
 import { project, report, reportVersion } from "@/db/schema";
+import { getOrgRole } from "./org-access";
 
 export async function verifyProjectAccess(userId: string, projectId: string): Promise<boolean> {
   const [row] = await db
-    .select({ id: project.id })
+    .select({ orgId: project.organizationId })
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.userId, userId)))
+    .where(eq(project.id, projectId))
     .limit(1);
-  return !!row;
+  if (!row) return false;
+  return !!(await getOrgRole(userId, row.orgId));
 }
 
 export async function verifyReportAccess(
@@ -16,10 +18,12 @@ export async function verifyReportAccess(
   projectId: string,
   reportId: string
 ): Promise<boolean> {
+  if (!(await verifyProjectAccess(userId, projectId))) return false;
+
   const [row] = await db
     .select({ id: report.id })
     .from(report)
-    .where(and(eq(report.id, reportId), eq(report.projectId, projectId), eq(report.userId, userId)))
+    .where(and(eq(report.id, reportId), eq(report.projectId, projectId)))
     .limit(1);
   return !!row;
 }

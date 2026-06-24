@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db/client";
 import { playbook, playbookVersion } from "@/db/schema";
-import { eq, or, isNull, desc, and, ne } from "drizzle-orm";
+import { eq, or, isNull, desc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
 import { IconPlus, IconBook } from "@tabler/icons-react";
 import { NewPlaybookDialog } from "./new-playbook-dialog";
@@ -18,9 +18,8 @@ export default async function PlaybooksPage() {
     .from(playbook)
     .where(
       or(
-        eq(playbook.userId, session.user.id),
-        isNull(playbook.userId),
-        and(eq(playbook.isPublic, true), ne(playbook.userId, session.user.id))
+        eq(playbook.organizationId, session.user.orgId),
+        isNull(playbook.organizationId) // system/public playbooks
       )
     )
     .orderBy(desc(playbook.createdAt));

@@ -9,12 +9,15 @@ const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status
 
 export async function requireApiKey(
   req: NextRequest
-): Promise<{ userId: string; error: null } | { userId: null; error: NextResponse }> {
+): Promise<
+  | { userId: string | null; orgId: string; error: null }
+  | { userId: null; orgId: null; error: NextResponse }
+> {
   const raw = req.headers
     .get("authorization")
     ?.replace(/^Bearer\s+/i, "")
     .trim();
-  if (!raw) return { userId: null, error: unauthorized() };
+  if (!raw) return { userId: null, orgId: null, error: unauthorized() };
 
   // ── API key path (ptg_ prefix) ────────────────────────────────────────────
   if (raw.startsWith("ptg_")) {
@@ -30,37 +33,52 @@ export async function requireApiKey(
       )
       .limit(1);
 
-    if (!key) return { userId: null, error: unauthorized() };
+    if (!key) return { userId: null, orgId: null, error: unauthorized() };
     db.update(apiKey).set({ lastUsedAt: new Date() }).where(eq(apiKey.id, key.id));
-    return { userId: key.userId, error: null };
+    return { userId: key.userId, orgId: key.organizationId, error: null };
   }
 
   // ── OAuth JWT path ────────────────────────────────────────────────────────
   const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
-  if (!secret) return { userId: null, error: unauthorized() };
+  if (!secret) return { userId: null, orgId: null, error: unauthorized() };
 
   try {
     const { payload } = await jwtVerify(raw, new TextEncoder().encode(secret), {
       algorithms: ["HS256"],
     });
 
-    const userId = payload.sub;
     const clientId = payload.cid as string | undefined;
-    if (!userId || !clientId) return { userId: null, error: unauthorized() };
+    // New tokens carry oid directly; legacy tokens (sub=userId) fall back to a DB lookup
+    const orgIdFromToken = payload.oid as string | undefined;
+    if (!clientId) return { userId: null, orgId: null, error: unauthorized() };
 
-    // Verify the OAuth client still exists and belongs to this user
+    if (orgIdFromToken) {
+      // Fast path: org is encoded in the token
+      const [client] = await db
+        .select({ id: oauthClient.id, userId: oauthClient.userId })
+        .from(oauthClient)
+        .where(eq(oauthClient.clientId, clientId))
+        .limit(1);
+
+      if (!client) return { userId: null, orgId: null, error: unauthorized() };
+      db.update(oauthClient).set({ lastUsedAt: new Date() }).where(eq(oauthClient.id, client.id));
+      return { userId: client.userId, orgId: orgIdFromToken, error: null };
+    }
+
+    // Legacy path: token has sub=userId, cid=clientId (pre-migration tokens)
+    const userId = payload.sub;
+    if (!userId) return { userId: null, orgId: null, error: unauthorized() };
+
     const [client] = await db
-      .select({ id: oauthClient.id })
+      .select({ id: oauthClient.id, organizationId: oauthClient.organizationId })
       .from(oauthClient)
       .where(and(eq(oauthClient.clientId, clientId), eq(oauthClient.userId, userId)))
       .limit(1);
 
-    if (!client) return { userId: null, error: unauthorized() };
-
+    if (!client) return { userId: null, orgId: null, error: unauthorized() };
     db.update(oauthClient).set({ lastUsedAt: new Date() }).where(eq(oauthClient.id, client.id));
-
-    return { userId, error: null };
+    return { userId, orgId: client.organizationId, error: null };
   } catch {
-    return { userId: null, error: unauthorized() };
+    return { userId: null, orgId: null, error: unauthorized() };
   }
 }

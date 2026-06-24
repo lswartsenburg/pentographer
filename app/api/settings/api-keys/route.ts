@@ -1,15 +1,20 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { apiKey } from "@/db/schema";
+import { apiKey, userAccount } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { getOrgRole } from "@/lib/org-access";
 
 export async function GET() {
   const { session, error } = await requireAuth();
   if (error) return error;
 
+  const role = await getOrgRole(session!.user.id, session!.user.orgId);
+  const isAdmin = role === "admin" || role === "owner";
+
+  // Admins see all org keys; regular members see only their own
   const keys = await db
     .select({
       id: apiKey.id,
@@ -17,9 +22,16 @@ export async function GET() {
       createdAt: apiKey.createdAt,
       lastUsedAt: apiKey.lastUsedAt,
       expiresAt: apiKey.expiresAt,
+      userId: apiKey.userId,
+      createdByName: userAccount.name,
     })
     .from(apiKey)
-    .where(eq(apiKey.userId, session!.user.id))
+    .leftJoin(userAccount, eq(apiKey.userId, userAccount.id))
+    .where(
+      isAdmin
+        ? eq(apiKey.organizationId, session!.user.orgId)
+        : and(eq(apiKey.organizationId, session!.user.orgId), eq(apiKey.userId, session!.user.id))
+    )
     .orderBy(desc(apiKey.createdAt));
 
   return NextResponse.json(keys);
@@ -46,6 +58,7 @@ export async function POST(req: NextRequest) {
   const [created] = await db
     .insert(apiKey)
     .values({
+      organizationId: session!.user.orgId,
       userId: session!.user.id,
       name: parsed.data.name,
       keyHash,

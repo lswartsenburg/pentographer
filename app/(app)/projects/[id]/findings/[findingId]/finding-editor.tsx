@@ -671,11 +671,14 @@ export function FindingEditor({
               value={cvssScore}
               onChange={(e) => setCvssScore(e.target.value)}
               placeholder="e.g. 8.1"
-              type="number"
-              min={0}
-              max={10}
-              step={0.1}
+              type="text"
+              inputMode="decimal"
             />
+            {cvssScore && !/^(10(\.0)?|[0-9](\.[0-9])?)$/.test(cvssScore.trim()) && (
+              <p className="text-[11px] text-destructive">
+                Enter a numeric score between 0.0 and 10.0
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">

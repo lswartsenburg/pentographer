@@ -31,13 +31,13 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const userId = session.user.id;
+  const orgId = session.user.orgId;
 
-  // All user projects
+  // All org projects
   const userProjects = await db
     .select({ id: project.id, status: project.status })
     .from(project)
-    .where(eq(project.userId, userId));
+    .where(eq(project.organizationId, orgId));
 
   const projectIds = userProjects.map((p) => p.id);
 
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
     .from(project)
     .leftJoin(customer, eq(project.customerId, customer.id))
     .leftJoin(finding, eq(finding.projectId, project.id))
-    .where(eq(project.userId, userId))
+    .where(eq(project.organizationId, orgId))
     .groupBy(project.id, customer.name)
     .orderBy(sql`${project.createdAt} desc`)
     .limit(5);

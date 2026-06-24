@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { project, auditLog, type TestAccount } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { requireOrgRole } from "@/lib/org-access";
 import { encrypt, decrypt } from "@/lib/crypto";
 
 const testAccountSchema = z.object({
@@ -22,6 +23,7 @@ const updateSchema = z.object({
   startDate: z.string().datetime({ offset: true }).nullable().optional(),
   endDate: z.string().datetime({ offset: true }).nullable().optional(),
   statusJustification: z.string().optional(),
+  playbookVersionId: z.string().uuid().nullable().optional(),
 });
 
 const BACKWARD_STATUSES: Record<string, string[]> = {
@@ -60,11 +62,11 @@ function decryptAccounts(
   }));
 }
 
-async function getOwnedProject(userId: string, id: string) {
+async function getOrgProject(orgId: string, id: string) {
   const [row] = await db
     .select()
     .from(project)
-    .where(and(eq(project.id, id), eq(project.userId, userId)))
+    .where(and(eq(project.id, id), eq(project.organizationId, orgId)))
     .limit(1);
   return row ?? null;
 }
@@ -74,7 +76,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error) return error;
   const { id } = await params;
 
-  const row = await getOwnedProject(session!.user.id, id);
+  const row = await getOrgProject(session!.user.orgId, id);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json({
@@ -88,7 +90,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (error) return error;
   const { id } = await params;
 
-  const row = await getOwnedProject(session!.user.id, id);
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const row = await getOrgProject(session!.user.orgId, id);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let body: unknown;
@@ -114,6 +120,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         );
       }
       await db.insert(auditLog).values({
+        organizationId: session!.user.orgId,
         userId: session!.user.id,
         action: "status_backward",
         resourceType: "project",
@@ -141,6 +148,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updateData.startDate = parsed.data.startDate ? new Date(parsed.data.startDate) : null;
   if (parsed.data.endDate !== undefined)
     updateData.endDate = parsed.data.endDate ? new Date(parsed.data.endDate) : null;
+  if (parsed.data.playbookVersionId !== undefined)
+    updateData.playbookVersionId = parsed.data.playbookVersionId;
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ ...row, testAccounts: decryptAccounts(row.testAccounts) });
+  }
 
   const [updated] = await db.update(project).set(updateData).where(eq(project.id, id)).returning();
 
@@ -155,7 +168,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (error) return error;
   const { id } = await params;
 
-  const row = await getOwnedProject(session!.user.id, id);
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const row = await getOrgProject(session!.user.orgId, id);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await db.delete(project).where(eq(project.id, id));

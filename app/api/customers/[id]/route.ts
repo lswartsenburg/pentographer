@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { customer } from "@/db/schema";
+import { customer, project } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { requireOrgRole } from "@/lib/org-access";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   contactEmail: z.string().email().max(255).nullable().optional(),
 });
 
-async function getOwnedCustomer(userId: string, id: string) {
+async function getOrgCustomer(orgId: string, id: string) {
   const [row] = await db
     .select()
     .from(customer)
-    .where(and(eq(customer.id, id), eq(customer.userId, userId)))
+    .where(and(eq(customer.id, id), eq(customer.organizationId, orgId)))
     .limit(1);
   return row ?? null;
 }
@@ -24,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error) return error;
   const { id } = await params;
 
-  const row = await getOwnedCustomer(session!.user.id, id);
+  const row = await getOrgCustomer(session!.user.orgId, id);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json(row);
@@ -35,7 +36,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (error) return error;
   const { id } = await params;
 
-  const row = await getOwnedCustomer(session!.user.id, id);
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const row = await getOrgCustomer(session!.user.orgId, id);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let body: unknown;
@@ -67,8 +72,24 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (error) return error;
   const { id } = await params;
 
-  const row = await getOwnedCustomer(session!.user.id, id);
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const row = await getOrgCustomer(session!.user.orgId, id);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const [{ projectCount }] = await db
+    .select({ projectCount: count() })
+    .from(project)
+    .where(eq(project.customerId, id));
+
+  if (projectCount > 0) {
+    return NextResponse.json(
+      { error: "Cannot delete a customer that has projects. Delete all projects first." },
+      { status: 409 }
+    );
+  }
 
   await db.delete(customer).where(eq(customer.id, id));
 

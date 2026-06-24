@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { playbook } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { requireOrgRole } from "@/lib/org-access";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -11,14 +12,14 @@ const updateSchema = z.object({
   isPublic: z.boolean().optional(),
 });
 
-async function getAccessiblePlaybook(userId: string, id: string) {
+async function getAccessiblePlaybook(orgId: string, id: string) {
   const [row] = await db
     .select()
     .from(playbook)
     .where(
       and(
         eq(playbook.id, id),
-        or(eq(playbook.userId, userId), isNull(playbook.userId), eq(playbook.isPublic, true))
+        or(eq(playbook.organizationId, orgId), isNull(playbook.organizationId))
       )
     )
     .limit(1);
@@ -30,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error) return error;
   const { id } = await params;
 
-  const row = await getAccessiblePlaybook(session!.user.id, id);
+  const row = await getAccessiblePlaybook(session!.user.orgId, id);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json(row);
@@ -41,10 +42,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (error) return error;
   const { id } = await params;
 
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const [row] = await db
     .select()
     .from(playbook)
-    .where(and(eq(playbook.id, id), eq(playbook.userId, session!.user.id)))
+    .where(and(eq(playbook.id, id), eq(playbook.organizationId, session!.user.orgId)))
     .limit(1);
 
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });

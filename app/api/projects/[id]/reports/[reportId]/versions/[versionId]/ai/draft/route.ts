@@ -27,7 +27,7 @@ export async function POST(
     );
   }
 
-  const client = getAnthropicClient();
+  const client = await getAnthropicClient(session!.user.orgId, session!.user.id);
   if (!client) return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
 
   const [proj] = await db

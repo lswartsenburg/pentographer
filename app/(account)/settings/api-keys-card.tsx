@@ -19,6 +19,7 @@ interface ApiKey {
   createdAt: Date;
   lastUsedAt: Date | null;
   expiresAt: Date | null;
+  createdByName?: string | null;
 }
 
 function fmt(d: Date | null): string {
@@ -32,6 +33,7 @@ function fmt(d: Date | null): string {
 
 export function ApiKeysCard({ initialKeys }: { initialKeys: ApiKey[] }) {
   const [keys, setKeys] = useState<ApiKey[]>(initialKeys);
+  const showCreatedBy = keys.some((k) => k.createdByName);
   const [showCreate, setShowCreate] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -117,6 +119,7 @@ export function ApiKeysCard({ initialKeys }: { initialKeys: ApiKey[] }) {
           <thead>
             <tr className="border-b border-border text-xs text-muted-foreground">
               <th className="text-left font-medium px-5 py-2">Name</th>
+              {showCreatedBy && <th className="text-left font-medium px-5 py-2">Created by</th>}
               <th className="text-left font-medium px-5 py-2">Created</th>
               <th className="text-left font-medium px-5 py-2">Last used</th>
               <th className="text-left font-medium px-5 py-2">Expires</th>
@@ -127,6 +130,9 @@ export function ApiKeysCard({ initialKeys }: { initialKeys: ApiKey[] }) {
             {keys.map((k) => (
               <tr key={k.id} className="border-b border-border last:border-0">
                 <td className="px-5 py-3 font-medium text-foreground">{k.name}</td>
+                {showCreatedBy && (
+                  <td className="px-5 py-3 text-muted-foreground">{k.createdByName ?? "—"}</td>
+                )}
                 <td className="px-5 py-3 text-muted-foreground">{fmt(k.createdAt)}</td>
                 <td className="px-5 py-3 text-muted-foreground">{fmt(k.lastUsedAt)}</td>
                 <td className="px-5 py-3 text-muted-foreground">{fmt(k.expiresAt)}</td>

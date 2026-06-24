@@ -47,15 +47,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      if (trigger === "update" && (session as { orgId?: string } | null)?.orgId) {
+        token.orgId = (session as { orgId: string }).orgId;
+      }
       if (user) {
         token.id = user.id;
+      }
+      // Fetch orgId on sign-in or when missing from an existing token (legacy sessions)
+      if (user || (token.id && !token.orgId)) {
+        const userId = (user?.id ?? token.id) as string;
+        const [row] = await db
+          .select({ orgId: userAccount.personalOrgId })
+          .from(userAccount)
+          .where(eq(userAccount.id, userId))
+          .limit(1);
+        token.orgId = row?.orgId ?? null;
       }
       return token;
     },
     async session({ session, token }) {
       if (token.id) {
         session.user.id = token.id as string;
+      }
+      if (token.orgId) {
+        session.user.orgId = token.orgId as string;
       }
       return session;
     },

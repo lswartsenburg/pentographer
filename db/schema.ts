@@ -8,6 +8,7 @@ import {
   numeric,
   timestamp,
   json,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -39,6 +40,57 @@ export const reportVersionStatusEnum = pgEnum("report_version_status", [
   "published",
 ]);
 
+export const orgRoleEnum = pgEnum("org_role", ["owner", "admin", "member", "viewer"]);
+
+// ─── Organization tables ──────────────────────────────────────────────────────
+
+export const organization = pgTable("organization", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  anthropicApiKey: text("anthropic_api_key"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const organizationMember = pgTable(
+  "organization_member",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userAccount.id, { onDelete: "cascade" }),
+    role: orgRoleEnum("role").notNull().default("member"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.organizationId, t.userId)]
+);
+
+export const team = pgTable("team", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const teamMember = pgTable(
+  "team_member",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => team.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userAccount.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.teamId, t.userId)]
+);
+
 // ─── Tables ──────────────────────────────────────────────────────────────────
 
 export const userAccount = pgTable("user_account", {
@@ -46,15 +98,22 @@ export const userAccount = pgTable("user_account", {
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  organizationName: text("organization_name"),
+  companyName: text("company_name"),
+  anthropicApiKey: text("anthropic_api_key"),
+  // Points to the user's personal org — set on registration and during migration backfill
+  personalOrgId: uuid("personal_org_id").references(() => organization.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const customer = pgTable("customer", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
+  organizationId: uuid("organization_id")
     .notNull()
-    .references(() => userAccount.id, { onDelete: "cascade" }),
+    .references(() => organization.id, { onDelete: "cascade" }),
+  // createdBy preserved for audit trail; not used for access control
+  userId: uuid("user_id").references(() => userAccount.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   contactEmail: text("contact_email"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -62,9 +121,11 @@ export const customer = pgTable("customer", {
 
 export const playbook = pgTable("playbook", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").references(() => userAccount.id, {
+  // null = system/public playbook; set for org-owned playbooks
+  organizationId: uuid("organization_id").references(() => organization.id, {
     onDelete: "cascade",
   }),
+  userId: uuid("user_id").references(() => userAccount.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   description: text("description"),
   isPublic: boolean("is_public").notNull().default(false),
@@ -111,9 +172,11 @@ export type TestAccount = { role: string; username: string; encryptedPassword?: 
 
 export const project = pgTable("project", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
+  organizationId: uuid("organization_id")
     .notNull()
-    .references(() => userAccount.id, { onDelete: "cascade" }),
+    .references(() => organization.id, { onDelete: "cascade" }),
+  // createdBy preserved for audit trail; not used for access control
+  userId: uuid("user_id").references(() => userAccount.id, { onDelete: "set null" }),
   customerId: uuid("customer_id")
     .notNull()
     .references(() => customer.id, { onDelete: "restrict" }),
@@ -208,9 +271,11 @@ export const reportVersion = pgTable("report_version", {
 
 export const reportTemplate = pgTable("report_template", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
+  organizationId: uuid("organization_id")
     .notNull()
-    .references(() => userAccount.id, { onDelete: "cascade" }),
+    .references(() => organization.id, { onDelete: "cascade" }),
+  // createdBy preserved for audit trail; not used for access control
+  userId: uuid("user_id").references(() => userAccount.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   description: text("description"),
   version: text("version"),
@@ -218,12 +283,16 @@ export const reportTemplate = pgTable("report_template", {
   publishNotes: text("publish_notes"),
   blobUrl: text("blob_url").notNull(),
   isPublic: boolean("is_public").notNull().default(false),
+  isDefault: boolean("is_default").notNull().default(false),
   downloadCount: integer("download_count").notNull().default(0),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 });
 
 export const auditLog = pgTable("audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").references(() => organization.id, {
+    onDelete: "set null",
+  }),
   userId: uuid("user_id").references(() => userAccount.id, {
     onDelete: "set null",
   }),
@@ -236,9 +305,11 @@ export const auditLog = pgTable("audit_log", {
 
 export const apiKey = pgTable("api_key", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
+  organizationId: uuid("organization_id")
     .notNull()
-    .references(() => userAccount.id, { onDelete: "cascade" }),
+    .references(() => organization.id, { onDelete: "cascade" }),
+  // createdBy preserved for audit trail; not used for access control
+  userId: uuid("user_id").references(() => userAccount.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   keyHash: text("key_hash").notNull().unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -246,11 +317,20 @@ export const apiKey = pgTable("api_key", {
   expiresAt: timestamp("expires_at"),
 });
 
+export const aiUsageLog = pgTable("ai_usage_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => userAccount.id, { onDelete: "set null" }),
+  orgId: uuid("org_id").references(() => organization.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const oauthClient = pgTable("oauth_client", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
+  organizationId: uuid("organization_id")
     .notNull()
-    .references(() => userAccount.id, { onDelete: "cascade" }),
+    .references(() => organization.id, { onDelete: "cascade" }),
+  // createdBy preserved for audit trail; not used for access control
+  userId: uuid("user_id").references(() => userAccount.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   clientId: text("client_id").notNull().unique(),
   clientSecretHash: text("client_secret_hash").notNull(),
@@ -260,7 +340,42 @@ export const oauthClient = pgTable("oauth_client", {
 
 // ─── Relations ───────────────────────────────────────────────────────────────
 
-export const userAccountRelations = relations(userAccount, ({ many }) => ({
+export const organizationRelations = relations(organization, ({ many }) => ({
+  members: many(organizationMember),
+  teams: many(team),
+  customers: many(customer),
+  projects: many(project),
+  playbooks: many(playbook),
+  reportTemplates: many(reportTemplate),
+  apiKeys: many(apiKey),
+  oauthClients: many(oauthClient),
+}));
+
+export const organizationMemberRelations = relations(organizationMember, ({ one }) => ({
+  organization: one(organization, {
+    fields: [organizationMember.organizationId],
+    references: [organization.id],
+  }),
+  user: one(userAccount, { fields: [organizationMember.userId], references: [userAccount.id] }),
+}));
+
+export const teamRelations = relations(team, ({ one, many }) => ({
+  organization: one(organization, { fields: [team.organizationId], references: [organization.id] }),
+  members: many(teamMember),
+}));
+
+export const teamMemberRelations = relations(teamMember, ({ one }) => ({
+  team: one(team, { fields: [teamMember.teamId], references: [team.id] }),
+  user: one(userAccount, { fields: [teamMember.userId], references: [userAccount.id] }),
+}));
+
+export const userAccountRelations = relations(userAccount, ({ one, many }) => ({
+  personalOrg: one(organization, {
+    fields: [userAccount.personalOrgId],
+    references: [organization.id],
+  }),
+  orgMemberships: many(organizationMember),
+  teamMemberships: many(teamMember),
   customers: many(customer),
   playbooks: many(playbook),
   projects: many(project),
@@ -270,15 +385,27 @@ export const userAccountRelations = relations(userAccount, ({ many }) => ({
 }));
 
 export const reportTemplateRelations = relations(reportTemplate, ({ one }) => ({
+  organization: one(organization, {
+    fields: [reportTemplate.organizationId],
+    references: [organization.id],
+  }),
   user: one(userAccount, { fields: [reportTemplate.userId], references: [userAccount.id] }),
 }));
 
 export const customerRelations = relations(customer, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [customer.organizationId],
+    references: [organization.id],
+  }),
   user: one(userAccount, { fields: [customer.userId], references: [userAccount.id] }),
   projects: many(project),
 }));
 
 export const playbookRelations = relations(playbook, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [playbook.organizationId],
+    references: [organization.id],
+  }),
   user: one(userAccount, { fields: [playbook.userId], references: [userAccount.id] }),
   versions: many(playbookVersion),
 }));
@@ -306,6 +433,10 @@ export const playbookItemRelations = relations(playbookItem, ({ one, many }) => 
 }));
 
 export const projectRelations = relations(project, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [project.organizationId],
+    references: [organization.id],
+  }),
   user: one(userAccount, { fields: [project.userId], references: [userAccount.id] }),
   customer: one(customer, { fields: [project.customerId], references: [customer.id] }),
   playbookVersion: one(playbookVersion, {
@@ -345,9 +476,17 @@ export const reportVersionRelations = relations(reportVersion, ({ one }) => ({
 }));
 
 export const apiKeyRelations = relations(apiKey, ({ one }) => ({
+  organization: one(organization, {
+    fields: [apiKey.organizationId],
+    references: [organization.id],
+  }),
   user: one(userAccount, { fields: [apiKey.userId], references: [userAccount.id] }),
 }));
 
 export const oauthClientRelations = relations(oauthClient, ({ one }) => ({
+  organization: one(organization, {
+    fields: [oauthClient.organizationId],
+    references: [organization.id],
+  }),
   user: one(userAccount, { fields: [oauthClient.userId], references: [userAccount.id] }),
 }));

@@ -92,7 +92,7 @@ export const typeDefs = /* GraphQL */ `
     id: ID!
     name: String!
     email: String!
-    organizationName: String
+    companyName: String
   }
 
   type Customer {

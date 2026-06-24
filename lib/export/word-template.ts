@@ -42,7 +42,7 @@ export interface ExportData {
   applicationUrl: string | null;
   reportVersion: string | null;
   testAccounts: TestAccount[] | null;
-  organizationName: string | null;
+  companyName: string | null;
   startDate: string | null;
   endDate: string | null;
   execSummary: string | null;
@@ -86,7 +86,7 @@ export function generateDocxFromTemplate(templateBuffer: Buffer, data: ExportDat
   const templateData = {
     projectName: data.projectName,
     customerName: data.customerName,
-    organizationName: data.organizationName ?? "",
+    companyName: data.companyName ?? "",
     scope: data.scope ?? "",
     applicationUrl: data.applicationUrl ?? "",
     reportVersion: data.reportVersion ?? "1.0",

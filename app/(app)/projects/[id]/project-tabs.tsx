@@ -72,20 +72,38 @@ interface ReportSummary {
   versions: ReportVersionSummary[];
 }
 
+interface ActivityEntry {
+  id: string;
+  action: string;
+  createdAt: string;
+  actorName: string | null;
+  // export
+  format: string | null;
+  reportName: string | null;
+  reportVersion: string | null;
+  // status_backward
+  statusFrom: string | null;
+  statusTo: string | null;
+  justification: string | null;
+}
+
 interface ProjectTabsProps {
   projectId: string;
   findings: Finding[];
   reports: ReportSummary[];
-  exportHistory: Array<{
-    id: string;
-    action: string;
-    createdAt: string;
-    format: string | null;
-    exporterName: string | null;
-    reportName: string | null;
-    reportVersion: string | null;
-  }>;
+  activityLog: ActivityEntry[];
 }
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  export: "Report exported",
+  status_backward: "Status moved back",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  in_progress: "In Progress",
+  under_review: "Under Review",
+  complete: "Complete",
+};
 
 const VERSION_STATUS_BADGE: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -99,7 +117,7 @@ const VERSION_STATUS_LABEL: Record<string, string> = {
   published: "Published",
 };
 
-export function ProjectTabs({ projectId, findings, reports, exportHistory }: ProjectTabsProps) {
+export function ProjectTabs({ projectId, findings, reports, activityLog }: ProjectTabsProps) {
   const router = useRouter();
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -235,24 +253,24 @@ export function ProjectTabs({ projectId, findings, reports, exportHistory }: Pro
 
   return (
     <Tabs defaultValue="findings" className="flex flex-col flex-1 min-h-0">
-      <TabsList className="shrink-0 justify-start rounded-none border-b border-border bg-transparent h-auto px-5 py-0">
+      <TabsList className="w-full shrink-0 justify-start rounded-none border-b border-border bg-transparent h-auto px-5 py-0">
         <TabsTrigger
           value="findings"
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground py-2.5 px-3 text-xs"
+          className="flex-none rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground py-2.5 px-3 text-xs"
         >
           Findings
         </TabsTrigger>
         <TabsTrigger
           value="reports"
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground py-2.5 px-3 text-xs"
+          className="flex-none rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground py-2.5 px-3 text-xs"
         >
           Reports
         </TabsTrigger>
         <TabsTrigger
-          value="export-history"
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground py-2.5 px-3 text-xs"
+          value="activities"
+          className="flex-none rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground py-2.5 px-3 text-xs"
         >
-          Export history
+          Activities
         </TabsTrigger>
       </TabsList>
 
@@ -528,44 +546,64 @@ export function ProjectTabs({ projectId, findings, reports, exportHistory }: Pro
         )}
       </TabsContent>
 
-      {/* Export history tab */}
-      <TabsContent value="export-history" className="flex-1 overflow-y-auto p-4 mt-0">
-        {exportHistory.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No exports yet.</p>
+      {/* Activities tab */}
+      <TabsContent value="activities" className="flex-1 overflow-y-auto p-4 mt-0">
+        {activityLog.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
         ) : (
           <div className="space-y-2">
-            {exportHistory.map((e) => (
+            {activityLog.map((e) => (
               <div
                 key={e.id}
-                className="bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm flex items-start gap-3"
+                className="bg-background border border-border rounded-lg px-3.5 py-2.5 text-sm"
               >
-                <div className="flex-1 min-w-0 space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium uppercase text-xs tracking-wide text-foreground">
-                      {e.format ?? "export"}
-                    </span>
-                    {e.reportName && (
-                      <>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="text-xs text-foreground truncate">
-                          {e.reportName}
-                          {e.reportVersion ? ` v${e.reportVersion}` : ""}
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-xs text-foreground">
+                        {ACTIVITY_LABELS[e.action] ?? e.action}
+                      </span>
+                      {e.action === "export" && (
+                        <>
+                          {e.format && (
+                            <span className="uppercase text-[11px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                              {e.format}
+                            </span>
+                          )}
+                          {e.reportName && (
+                            <span className="text-xs text-muted-foreground truncate">
+                              {e.reportName}
+                              {e.reportVersion ? ` v${e.reportVersion}` : ""}
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {e.action === "status_backward" && e.statusFrom && e.statusTo && (
+                        <span className="text-xs text-muted-foreground">
+                          {STATUS_LABELS[e.statusFrom] ?? e.statusFrom}
+                          {" → "}
+                          {STATUS_LABELS[e.statusTo] ?? e.statusTo}
                         </span>
-                      </>
+                      )}
+                    </div>
+                    {e.action === "status_backward" && e.justification && (
+                      <p className="text-[11px] text-muted-foreground italic truncate">
+                        &ldquo;{e.justification}&rdquo;
+                      </p>
                     )}
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    {e.exporterName && <span>{e.exporterName}</span>}
-                    {e.exporterName && <span>·</span>}
-                    <span>
-                      {new Date(e.createdAt).toLocaleString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      {e.actorName && <span>{e.actorName}</span>}
+                      {e.actorName && <span>·</span>}
+                      <span>
+                        {new Date(e.createdAt).toLocaleString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

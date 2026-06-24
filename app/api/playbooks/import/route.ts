@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const userId = session!.user.id;
+  const orgId = session!.user.orgId;
 
   let data: Record<string, unknown>;
   try {
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
       .insert(playbook)
       .values({
         userId,
+        organizationId: orgId,
         name: (data.name as string).trim(),
         description: typeof data.description === "string" ? data.description : null,
         isPublic: false,

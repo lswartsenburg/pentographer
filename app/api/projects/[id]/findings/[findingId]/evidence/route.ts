@@ -15,11 +15,11 @@ const ALLOWED_TYPES = new Set([
 ]);
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 
-async function verifyAccess(userId: string, projectId: string, findingId: string) {
+async function verifyAccess(orgId: string, projectId: string, findingId: string) {
   const [proj] = await db
     .select({ id: project.id })
     .from(project)
-    .where(and(eq(project.id, projectId), eq(project.userId, userId)))
+    .where(and(eq(project.id, projectId), eq(project.organizationId, orgId)))
     .limit(1);
   if (!proj) return false;
 
@@ -39,7 +39,7 @@ export async function POST(
   if (error) return error;
   const { id: projectId, findingId } = await params;
 
-  const ok = await verifyAccess(session!.user.id, projectId, findingId);
+  const ok = await verifyAccess(session!.user.orgId, projectId, findingId);
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const formData = await request.formData().catch(() => null);
@@ -70,7 +70,7 @@ export async function DELETE(
   if (error) return error;
   const { id: projectId, findingId } = await params;
 
-  const ok = await verifyAccess(session!.user.id, projectId, findingId);
+  const ok = await verifyAccess(session!.user.orgId, projectId, findingId);
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { url } = await request.json().catch(() => ({}));

@@ -11,6 +11,8 @@ import {
   IconTrash,
   IconGlobe,
   IconLock,
+  IconStar,
+  IconStarFilled,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 
@@ -22,6 +24,7 @@ interface TemplateInfo {
   language: string | null;
   publishNotes: string | null;
   isPublic: boolean;
+  isDefault: boolean;
   downloadCount: number;
   uploadedAt: string;
 }
@@ -56,6 +59,8 @@ function TemplateRow({
   const [publishNotes, setPublishNotes] = useState(template.publishNotes ?? "");
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [settingDefault, setSettingDefault] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   async function handleSave() {
@@ -99,6 +104,23 @@ function TemplateRow({
     toast.success(
       data.isPublic ? "Template published to marketplace." : "Template set to private."
     );
+  }
+
+  async function handleSetDefault() {
+    setSettingDefault(true);
+    const res = await fetch(`/api/settings/report-template/${template.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isDefault: !template.isDefault }),
+    });
+    setSettingDefault(false);
+    if (!res.ok) {
+      toast.error("Failed to update default.");
+      return;
+    }
+    const data = await res.json();
+    onUpdate(template.id, data);
+    toast.success(data.isDefault ? "Set as default template." : "Removed as default.");
   }
 
   async function handleDelete() {
@@ -211,6 +233,21 @@ function TemplateRow({
             <Button
               size="sm"
               variant="ghost"
+              onClick={handleSetDefault}
+              disabled={settingDefault}
+              className="cursor-pointer h-7 px-2 gap-1"
+              title={template.isDefault ? "Remove as default" : "Set as default template"}
+            >
+              {template.isDefault ? (
+                <IconStarFilled size={13} className="text-amber-500" />
+              ) : (
+                <IconStar size={13} />
+              )}
+              <span className="text-xs">{template.isDefault ? "Default" : "Set default"}</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={handleTogglePublic}
               disabled={toggling}
               className="cursor-pointer h-7 px-2 gap-1"
@@ -223,15 +260,37 @@ function TemplateRow({
               )}
               <span className="text-xs">{template.isPublic ? "Public" : "Private"}</span>
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="cursor-pointer h-7 px-2 text-destructive hover:text-destructive"
-            >
-              <IconTrash size={13} />
-            </Button>
+            {confirmDelete ? (
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-destructive">Delete?</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="cursor-pointer h-7 px-2 text-destructive hover:text-destructive"
+                >
+                  {deleting ? "…" : "Yes"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirmDelete(false)}
+                  className="cursor-pointer h-7 px-2"
+                >
+                  No
+                </Button>
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setConfirmDelete(true)}
+                className="cursor-pointer h-7 px-2 text-destructive hover:text-destructive"
+              >
+                <IconTrash size={13} />
+              </Button>
+            )}
           </div>
         </div>
       )}

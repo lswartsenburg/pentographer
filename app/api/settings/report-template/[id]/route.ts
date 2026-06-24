@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getStorage } from "@/lib/storage";
 import { db } from "@/db/client";
 import { reportTemplate } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { requireOrgRole } from "@/lib/org-access";
 
 const patchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -13,13 +14,14 @@ const patchSchema = z.object({
   language: z.string().max(100).nullable().optional(),
   publishNotes: z.string().max(1000).nullable().optional(),
   isPublic: z.boolean().optional(),
+  isDefault: z.boolean().optional(),
 });
 
-async function getOwnedTemplate(userId: string, templateId: string) {
+async function getOrgTemplate(orgId: string, templateId: string) {
   const [row] = await db
     .select()
     .from(reportTemplate)
-    .where(and(eq(reportTemplate.id, templateId), eq(reportTemplate.userId, userId)))
+    .where(and(eq(reportTemplate.id, templateId), eq(reportTemplate.organizationId, orgId)))
     .limit(1);
   return row ?? null;
 }
@@ -32,6 +34,7 @@ const templateFields = {
   language: reportTemplate.language,
   publishNotes: reportTemplate.publishNotes,
   isPublic: reportTemplate.isPublic,
+  isDefault: reportTemplate.isDefault,
   downloadCount: reportTemplate.downloadCount,
   uploadedAt: reportTemplate.uploadedAt,
 } as const;
@@ -41,7 +44,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (error) return error;
   const { id: templateId } = await params;
 
-  const tmpl = await getOwnedTemplate(session!.user.id, templateId);
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const tmpl = await getOrgTemplate(session!.user.orgId, templateId);
   if (!tmpl) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let body: unknown;
@@ -63,6 +70,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (parsed.data.language !== undefined) updates.language = parsed.data.language;
   if (parsed.data.publishNotes !== undefined) updates.publishNotes = parsed.data.publishNotes;
   if (parsed.data.isPublic !== undefined) updates.isPublic = parsed.data.isPublic;
+  if (parsed.data.isDefault !== undefined) {
+    if (parsed.data.isDefault) {
+      // Clear default from all other templates in this org first
+      await db
+        .update(reportTemplate)
+        .set({ isDefault: false })
+        .where(
+          and(
+            eq(reportTemplate.organizationId, session!.user.orgId),
+            ne(reportTemplate.id, templateId)
+          )
+        );
+    }
+    updates.isDefault = parsed.data.isDefault;
+  }
 
   const [updated] = await db
     .update(reportTemplate)
@@ -78,7 +100,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (error) return error;
   const { id: templateId } = await params;
 
-  const tmpl = await getOwnedTemplate(session!.user.id, templateId);
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const tmpl = await getOrgTemplate(session!.user.orgId, templateId);
   if (!tmpl) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await getStorage().del(tmpl.blobUrl);

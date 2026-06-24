@@ -16,6 +16,7 @@ import {
 import { eq, and, desc, count } from "drizzle-orm";
 import { ProjectTabs } from "./project-tabs";
 import { ProjectSidebar } from "./project-sidebar";
+import { ProjectActions } from "./project-actions";
 import { decrypt } from "@/lib/crypto";
 import type { TestAccount } from "@/db/schema";
 
@@ -46,7 +47,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .leftJoin(customer, eq(project.customerId, customer.id))
     .leftJoin(playbookVersion, eq(project.playbookVersionId, playbookVersion.id))
     .leftJoin(playbook, eq(playbookVersion.playbookId, playbook.id))
-    .where(and(eq(project.id, id), eq(project.userId, session.user.id)))
+    .where(and(eq(project.id, id), eq(project.organizationId, session.user.orgId)))
     .limit(1);
 
   if (!proj) notFound();
@@ -106,25 +107,19 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     })
   );
 
-  const rawExportHistory = await db
+  const rawActivityLog = await db
     .select({
       id: auditLog.id,
       action: auditLog.action,
       createdAt: auditLog.createdAt,
       metadata: auditLog.metadata,
-      exporterName: userAccount.name,
+      actorName: userAccount.name,
     })
     .from(auditLog)
     .leftJoin(userAccount, eq(auditLog.userId, userAccount.id))
-    .where(
-      and(
-        eq(auditLog.resourceType, "project"),
-        eq(auditLog.resourceId, id),
-        eq(auditLog.action, "export")
-      )
-    )
+    .where(and(eq(auditLog.resourceType, "project"), eq(auditLog.resourceId, id)))
     .orderBy(desc(auditLog.createdAt))
-    .limit(20);
+    .limit(50);
 
   // Build a flat map of versionId → { reportName, version } for quick lookup
   const versionIndex = new Map<string, { reportName: string; version: string }>();
@@ -134,7 +129,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     }
   }
 
-  const exportHistory = rawExportHistory.map((e) => {
+  const activityLog = rawActivityLog.map((e) => {
     const meta = e.metadata as Record<string, string> | null;
     const rvId = meta?.reportVersionId ?? null;
     const reportInfo = rvId ? (versionIndex.get(rvId) ?? null) : null;
@@ -142,10 +137,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       id: e.id,
       action: e.action,
       createdAt: e.createdAt.toISOString(),
+      actorName: e.actorName ?? null,
+      // export-specific
       format: meta?.format ?? null,
-      exporterName: e.exporterName ?? null,
       reportName: reportInfo?.reportName ?? null,
       reportVersion: reportInfo?.version ?? null,
+      // status_backward-specific
+      statusFrom: meta?.from ?? null,
+      statusTo: meta?.to ?? null,
+      justification: meta?.justification ?? null,
     };
   });
 
@@ -161,7 +161,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <span>/</span>
           <span className="text-foreground font-medium">{proj.name}</span>
         </nav>
-        <div className="flex items-center gap-2" />
+        <ProjectActions projectId={id} currentName={proj.name} />
       </header>
 
       <div className="flex flex-1 min-h-0">
@@ -170,6 +170,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           projectId={id}
           status={proj.status}
           customerName={proj.customerName ?? null}
+          playbookVersionId={proj.playbookVersionId ?? null}
           playbookName={proj.playbookName ?? null}
           playbookVersion={proj.playbookVersion ?? null}
           scope={proj.scope ?? null}
@@ -205,7 +206,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 createdAt: v.createdAt.toISOString(),
               })),
             }))}
-            exportHistory={exportHistory}
+            activityLog={activityLog}
           />
         </div>
       </div>

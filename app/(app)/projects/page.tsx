@@ -58,10 +58,10 @@ export default async function ProjectsPage({
     .where(
       filterStatus && filterStatus !== "all"
         ? and(
-            eq(project.userId, session.user.id),
+            eq(project.organizationId, session.user.orgId),
             eq(project.status, filterStatus as "in_progress" | "under_review" | "complete")
           )
-        : eq(project.userId, session.user.id)
+        : eq(project.organizationId, session.user.orgId)
     )
     .groupBy(project.id, customer.name, playbook.name, playbookVersion.version)
     .orderBy(desc(project.createdAt));

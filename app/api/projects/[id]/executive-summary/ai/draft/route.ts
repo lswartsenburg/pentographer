@@ -13,7 +13,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (error) return error;
   const { id: projectId } = await params;
 
-  const client = getAnthropicClient();
+  const client = await getAnthropicClient(session!.user.orgId, session!.user.id);
   if (!client) {
     return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
   }

@@ -1,6 +1,6 @@
 /**
  * Creates the minimum fixtures needed for E2E tests:
- *   - A test user (TEST_EMAIL / TEST_PASSWORD)
+ *   - A test user (TEST_EMAIL / TEST_PASSWORD) with a personal org
  *   - A test customer
  *   - A test project
  *
@@ -10,7 +10,8 @@
 import fs from "fs";
 import bcrypt from "bcryptjs";
 import { db } from "./client";
-import { userAccount, customer, project } from "./schema";
+import { userAccount, customer, project, organization, organizationMember } from "./schema";
+import { eq } from "drizzle-orm";
 
 const email = process.env.TEST_EMAIL;
 const password = process.env.TEST_PASSWORD;
@@ -23,22 +24,42 @@ if (!email || !password) {
 async function seed() {
   const passwordHash = await bcrypt.hash(password!, 10);
 
-  const [user] = await db
-    .insert(userAccount)
-    .values({ name: "CI Test User", email: email!, passwordHash })
-    .returning();
+  const result = await db.transaction(async (tx) => {
+    const [user] = await tx
+      .insert(userAccount)
+      .values({ name: "CI Test User", email: email!, passwordHash })
+      .returning();
 
-  const [cust] = await db
-    .insert(customer)
-    .values({ userId: user.id, name: "CI Test Customer" })
-    .returning();
+    const [org] = await tx
+      .insert(organization)
+      .values({ name: "CI Test User's Workspace" })
+      .returning();
 
-  const [proj] = await db
-    .insert(project)
-    .values({ userId: user.id, customerId: cust.id, name: "CI Test Project" })
-    .returning();
+    await tx
+      .insert(organizationMember)
+      .values({ organizationId: org.id, userId: user.id, role: "owner" });
 
-  const line = `TEST_PROJECT_ID=${proj.id}`;
+    await tx.update(userAccount).set({ personalOrgId: org.id }).where(eq(userAccount.id, user.id));
+
+    const [cust] = await tx
+      .insert(customer)
+      .values({ organizationId: org.id, userId: user.id, name: "CI Test Customer" })
+      .returning();
+
+    const [proj] = await tx
+      .insert(project)
+      .values({
+        organizationId: org.id,
+        userId: user.id,
+        customerId: cust.id,
+        name: "CI Test Project",
+      })
+      .returning();
+
+    return { proj };
+  });
+
+  const line = `TEST_PROJECT_ID=${result.proj.id}`;
   if (process.env.GITHUB_ENV) {
     fs.appendFileSync(process.env.GITHUB_ENV, `${line}\n`);
     console.log("Wrote TEST_PROJECT_ID to GITHUB_ENV");

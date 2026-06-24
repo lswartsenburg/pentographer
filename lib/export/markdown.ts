@@ -74,7 +74,7 @@ export async function generateMarkdownZip(data: ExportData): Promise<Buffer> {
   const meta: [string, string][] = (
     [
       ["Customer", data.customerName],
-      ["Organization", data.organizationName ?? ""],
+      ["Organization", data.companyName ?? ""],
       ["Version", data.reportVersion ?? ""],
       ["Application URL", data.applicationUrl ?? ""],
       ["Scope", data.scope ?? ""],

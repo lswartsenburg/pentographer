@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { project, customer, playbookVersion } from "@/db/schema";
 import { requireAuth } from "@/lib/auth";
+import { requireOrgRole } from "@/lib/org-access";
 
 const testAccountSchema = z.object({ role: z.string().max(100), username: z.string().max(200) });
 
@@ -39,7 +40,7 @@ export async function GET() {
     .from(project)
     .leftJoin(customer, eq(project.customerId, customer.id))
     .leftJoin(playbookVersion, eq(project.playbookVersionId, playbookVersion.id))
-    .where(eq(project.userId, session!.user.id))
+    .where(eq(project.organizationId, session!.user.orgId))
     .orderBy(desc(project.createdAt));
 
   return NextResponse.json(rows);
@@ -48,6 +49,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const { session, error } = await requireAuth();
   if (error) return error;
+
+  if (!(await requireOrgRole(session!.user.id, session!.user.orgId, "member"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   let body: unknown;
   try {
@@ -61,11 +66,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  // Verify customer belongs to user
+  // Verify customer belongs to the same org
   const [cust] = await db
     .select({ id: customer.id })
     .from(customer)
-    .where(eq(customer.id, parsed.data.customerId))
+    .where(
+      and(eq(customer.id, parsed.data.customerId), eq(customer.organizationId, session!.user.orgId))
+    )
     .limit(1);
 
   if (!cust) {
@@ -75,6 +82,7 @@ export async function POST(request: NextRequest) {
   const [created] = await db
     .insert(project)
     .values({
+      organizationId: session!.user.orgId,
       userId: session!.user.id,
       customerId: parsed.data.customerId,
       playbookVersionId: parsed.data.playbookVersionId ?? null,

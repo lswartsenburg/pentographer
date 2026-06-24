@@ -51,7 +51,7 @@ export async function POST(
   const access = await verifyReportVersionAccess(session!.user.id, projectId, reportId, versionId);
   if (!access) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const client = getAnthropicClient();
+  const client = await getAnthropicClient(session!.user.orgId, session!.user.id);
   if (!client) return NextResponse.json({ error: "AI_NOT_CONFIGURED" }, { status: 503 });
 
   let body: unknown;
