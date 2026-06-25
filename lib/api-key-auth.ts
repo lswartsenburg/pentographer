@@ -47,9 +47,15 @@ export async function requireApiKey(
       algorithms: ["HS256"],
     });
 
+    // User-delegated tokens (authorization_code flow) carry uid + oid directly
+    const userIdFromToken = payload.uid as string | undefined;
+    const orgIdFromToken = payload.oid as string | undefined;
+    if (userIdFromToken && orgIdFromToken) {
+      return { userId: userIdFromToken, orgId: orgIdFromToken, error: null };
+    }
+
     const clientId = payload.cid as string | undefined;
     // New tokens carry oid directly; legacy tokens (sub=userId) fall back to a DB lookup
-    const orgIdFromToken = payload.oid as string | undefined;
     if (!clientId) return { userId: null, orgId: null, error: unauthorized() };
 
     if (orgIdFromToken) {
