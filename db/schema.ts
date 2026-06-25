@@ -338,6 +338,23 @@ export const oauthClient = pgTable("oauth_client", {
   lastUsedAt: timestamp("last_used_at"),
 });
 
+export const oauthAuthCode = pgTable("oauth_auth_code", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  clientId: text("client_id").notNull(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => userAccount.id, { onDelete: "cascade" }),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge"),
+  codeChallengeMethod: text("code_challenge_method"),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+});
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 export const organizationRelations = relations(organization, ({ many }) => ({

@@ -13,6 +13,11 @@ export const authConfig: NextAuthConfig = {
         return true;
       }
 
+      // Public well-known endpoints (OAuth discovery, etc.)
+      if (nextUrl.pathname.startsWith("/.well-known/")) {
+        return true;
+      }
+
       // Public pages accessible to everyone regardless of auth state
       if (nextUrl.pathname.startsWith("/security")) {
         return true;
