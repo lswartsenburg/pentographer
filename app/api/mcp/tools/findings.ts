@@ -389,7 +389,7 @@ export function registerFindingTools(server: McpServer, userId: string) {
         caption: z
           .string()
           .optional()
-          .describe("Optional caption shown under the image in the finding"),
+          .describe("Optional label for the evidence (caption for images, link text for PDFs)"),
       },
     },
     async ({ findingId, filename, mimeType, base64Data, caption }) => {
@@ -426,9 +426,11 @@ export function registerFindingTools(server: McpServer, userId: string) {
         .orderBy(desc(findingVersion.createdAt))
         .limit(1);
 
-      const imageRef = caption
-        ? `\n\n![${caption}](${blob.url})\n*${caption}*`
-        : `\n\n![${safeName}](${blob.url})`;
+      const isImage = mimeType !== "application/pdf";
+      const label = caption ?? safeName;
+      const imageRef = isImage
+        ? `\n\n![${label}](${blob.url})${caption ? `\n*${caption}*` : ""}`
+        : `\n\n[${label}](${blob.url})`;
 
       await db.insert(findingVersion).values({
         findingId,

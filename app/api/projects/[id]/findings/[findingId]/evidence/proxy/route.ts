@@ -60,11 +60,20 @@ export async function GET(
   const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
   const contentLength = upstream.headers.get("content-length");
 
+  // These types are safe to display inline in an <img> tag. Everything else
+  // (SVG, HTML, XML, unknown) forces a download so it can't execute in the
+  // app's origin if a user navigates to the proxy URL directly.
+  const SAFE_INLINE = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]);
+  const baseType = contentType.split(";")[0].trim();
+  const attachment = !SAFE_INLINE.has(baseType);
+
   return new NextResponse(upstream.body, {
     headers: {
       "Content-Type": contentType,
       ...(contentLength ? { "Content-Length": contentLength } : {}),
       "Cache-Control": "private, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
+      ...(attachment ? { "Content-Disposition": "attachment" } : {}),
     },
   });
 }
