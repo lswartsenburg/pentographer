@@ -14,6 +14,8 @@
     "db:seed:demo": "tsx db/seed.demo.ts",
     "prepare": "husky",
     "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test",
     "commit": "cz",
     "format": "prettier --write .",
@@ -99,7 +101,9 @@
     "prettier": "^3.8.4",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.9"
   },
   "packageManager": "pnpm@10.6.2"
 }

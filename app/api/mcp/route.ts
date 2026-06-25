@@ -7,7 +7,7 @@ async function handle(req: NextRequest) {
   const auth = await requireApiKey(req);
   if (auth.error) return auth.error;
 
-  const server = createMcpServer(auth.userId ?? "");
+  const server = createMcpServer(auth.userId ?? "", auth.orgId ?? "");
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless — each request is independent
   });
