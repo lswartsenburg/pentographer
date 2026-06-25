@@ -17,7 +17,11 @@ import {
   IconCheck,
   IconLoader2,
   IconPlus,
+  IconSun,
+  IconMoon,
+  IconDeviceDesktop,
 } from "@tabler/icons-react";
+import { useTheme } from "next-themes";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +42,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -88,6 +94,7 @@ export function AppSidebar({ user, orgId, orgs }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { update } = useSession();
+  const { theme, setTheme } = useTheme();
   const [switching, setSwitching] = useState(false);
   const [newOrgOpen, setNewOrgOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
@@ -277,6 +284,23 @@ export function AppSidebar({ user, orgId, orgs }: AppSidebarProps) {
                       Settings
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuLabel className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide px-2 py-1.5">
+                    Theme
+                  </DropdownMenuLabel>
+                  <DropdownMenuRadioGroup value={theme ?? "system"} onValueChange={setTheme}>
+                    <DropdownMenuRadioItem value="light">
+                      <IconSun size={14} />
+                      Light
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="dark">
+                      <IconMoon size={14} />
+                      Dark
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="system">
+                      <IconDeviceDesktop size={14} />
+                      System
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => signOut({ callbackUrl: "/login" })}

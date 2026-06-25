@@ -88,6 +88,28 @@
   --sidebar-accent: #1e3a5f;
   --sidebar-accent-foreground: #93c5fd;
   --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #378add;
+
+  /* Missing from light palette */
+  --input-background: rgba(255, 255, 255, 0.05);
+  --switch-background: #475569;
+
+  /* AI accent */
+  --ai-bg: #1e1b3a;
+  --ai-border: #6d64c8;
+  --ai-fg: #c4bfef;
+
+  /* Risk colors */
+  --risk-high-bg: #3b1212;
+  --risk-high-fg: #f87171;
+  --risk-med-bg: #3b2208;
+  --risk-med-fg: #fdba74;
+  --risk-low-bg: #14321a;
+  --risk-low-fg: #86efac;
+
+  /* Info / badge */
+  --info-bg: #1e3a5f;
+  --info-fg: #93c5fd;
 }
 
 @theme inline {
