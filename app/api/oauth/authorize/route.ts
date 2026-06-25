@@ -11,7 +11,7 @@ function errorRedirect(redirectUri: string, error: string, state?: string | null
   const url = new URL(redirectUri);
   url.searchParams.set("error", error);
   if (state) url.searchParams.set("state", state);
-  return NextResponse.redirect(url.toString());
+  return NextResponse.redirect(url.toString(), 302);
 }
 
 function consentHtml(clientName: string, params: Record<string, string>): NextResponse {
@@ -211,5 +211,5 @@ export async function POST(req: NextRequest) {
   url.searchParams.set("code", code);
   if (state) url.searchParams.set("state", state);
 
-  return NextResponse.redirect(url.toString());
+  return NextResponse.redirect(url.toString(), 302);
 }
