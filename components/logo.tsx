@@ -1,9 +1,20 @@
+"use client";
+
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
+
 interface PentographerMarkProps {
   size?: number;
   theme?: "dark" | "light";
 }
 
-export function PentographerMark({ size = 64, theme = "light" }: PentographerMarkProps) {
+export function PentographerMark({ size = 64, theme: themeProp }: PentographerMarkProps) {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const theme = themeProp ?? (mounted ? (resolvedTheme === "dark" ? "dark" : "light") : "light");
+
   const tile = theme === "dark" ? "#080E1A" : "#185FA5";
   const nibTop = theme === "dark" ? "#C8D8EE" : "#ffffff";
   const nibBot = theme === "dark" ? "#6A8DB8" : "#bfdbfe";
@@ -77,7 +88,13 @@ interface LogoWordmarkProps {
   size?: "sm" | "md" | "lg";
 }
 
-export function LogoWordmark({ theme = "light", size = "md" }: LogoWordmarkProps) {
+export function LogoWordmark({ theme: themeProp, size = "md" }: LogoWordmarkProps) {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const theme = themeProp ?? (mounted ? (resolvedTheme === "dark" ? "dark" : "light") : "light");
+
   const markSize = size === "sm" ? 24 : size === "lg" ? 48 : 32;
   const fontSize = size === "sm" ? "text-base" : size === "lg" ? "text-3xl" : "text-xl";
   const pentoColor = theme === "dark" ? "text-slate-100" : "text-slate-900";
