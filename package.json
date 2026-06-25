@@ -27,6 +27,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",
     "@auth/drizzle-adapter": "^1.11.2",
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@hookform/resolvers": "^5.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@radix-ui/react-accordion": "^1.2.14",
