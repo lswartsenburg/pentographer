@@ -14,7 +14,7 @@ const saveSchema = z.object({
   cvssScore: z.string().nullable().optional(),
   status: z.enum(["draft", "in_review", "confirmed", "informational", "false_positive"]),
   evidenceUrls: z
-    .array(z.object({ key: z.string().max(50), url: z.string().url() }))
+    .array(z.object({ key: z.string().max(50), url: z.string().min(1) }))
     .max(20)
     .optional(),
   justification: z.string().optional(),

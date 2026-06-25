@@ -85,6 +85,10 @@ Starts the app, PostgreSQL, and MinIO (local blob storage):
 docker compose up
 ```
 
+MinIO is accessible at `http://localhost:9000` (API) and `http://localhost:9001` (web console). Default credentials are `minioadmin / minioadmin` — change them via `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` environment variables before exposing to a network.
+
+> **Note:** File uploads are served through the app's `/api/files/` proxy, which enforces authentication. The MinIO bucket has no public access policy, so files stored in MinIO are not reachable by unauthenticated requests even if the MinIO port is exposed.
+
 ## Scripts
 
 | Command            | Description                            |

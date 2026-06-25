@@ -8,6 +8,9 @@ export function getStorage(): StorageAdapter {
   if (process.env.STORAGE_BACKEND === "local") {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     _adapter = require("./local").localAdapter;
+  } else if (process.env.STORAGE_BACKEND === "minio") {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _adapter = require("./minio").minioAdapter;
   } else {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     _adapter = require("./vercel").vercelAdapter;

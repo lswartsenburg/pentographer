@@ -19,7 +19,9 @@
     "test:e2e": "playwright test",
     "commit": "cz",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest"
   },
   "config": {
     "commitizen": {
@@ -29,6 +31,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",
     "@auth/drizzle-adapter": "^1.11.2",
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@hookform/resolvers": "^5.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@radix-ui/react-accordion": "^1.2.14",
