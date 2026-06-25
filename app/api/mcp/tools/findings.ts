@@ -294,4 +294,68 @@ export function registerFindingTools(server: McpServer, userId: string) {
       };
     }
   );
+
+  server.registerTool(
+    "add_evidence_note",
+    {
+      description:
+        "Append a text evidence note to a finding (e.g. raw HTTP request/response, tool output, packet captures, reproduction steps). Creates a new finding version that preserves all existing content and appends the note to the description.",
+      inputSchema: {
+        findingId: z.string().uuid().describe("The finding ID"),
+        note: z
+          .string()
+          .describe(
+            "The evidence content to append — tool output, HTTP request/response, reproduction steps, etc."
+          ),
+        label: z
+          .string()
+          .optional()
+          .describe("Short label for this evidence block, e.g. 'nmap output', 'HTTP request'"),
+      },
+    },
+    async ({ findingId, note, label }) => {
+      const [row] = await db
+        .select({ f: finding, userId: project.userId })
+        .from(finding)
+        .innerJoin(project, eq(finding.projectId, project.id))
+        .where(and(eq(finding.id, findingId), eq(project.userId, userId)))
+        .limit(1);
+
+      if (!row) {
+        return { content: [{ type: "text" as const, text: "Finding not found." }] };
+      }
+
+      const [latest] = await db
+        .select()
+        .from(findingVersion)
+        .where(eq(findingVersion.findingId, findingId))
+        .orderBy(desc(findingVersion.createdAt))
+        .limit(1);
+
+      const heading = label ? `**${label}**` : "**Evidence**";
+      const block = `\n\n---\n${heading}\n\`\`\`\n${note}\n\`\`\``;
+      const updatedDescription = (latest?.description ?? "") + block;
+
+      await db.insert(findingVersion).values({
+        findingId,
+        title: latest?.title ?? row.f.title,
+        riskLevel: latest?.riskLevel ?? row.f.riskLevel,
+        status: latest?.status ?? row.f.status,
+        description: updatedDescription,
+        remediation: latest?.remediation ?? null,
+        cvssScore: latest?.cvssScore ?? null,
+        evidenceUrls: latest?.evidenceUrls ?? [],
+        authorType: "ai",
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Appended evidence note to finding [${findingId}]${label ? ` (${label})` : ""}.`,
+          },
+        ],
+      };
+    }
+  );
 }
