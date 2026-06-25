@@ -271,7 +271,12 @@ export function registerFindingTools(server: McpServer, userId: string) {
       const newRisk = riskLevel ?? latest?.riskLevel ?? row.f.riskLevel;
 
       await db.transaction(async (tx) => {
-        if (riskLevel) await tx.update(finding).set({ riskLevel }).where(eq(finding.id, findingId));
+        if (title || riskLevel) {
+          await tx
+            .update(finding)
+            .set({ ...(title && { title }), ...(riskLevel && { riskLevel }) })
+            .where(eq(finding.id, findingId));
+        }
         await tx.insert(findingVersion).values({
           findingId,
           title: title ?? latest?.title ?? row.f.title,
