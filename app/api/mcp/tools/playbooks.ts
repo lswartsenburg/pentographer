@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, or, isNull, asc, desc } from "drizzle-orm";
+import { eq, and, or, isNull, asc, desc, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { playbook, playbookVersion, playbookCategory, playbookItem } from "@/db/schema";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -171,6 +171,31 @@ export function registerPlaybookTools(server: McpServer, userId: string) {
         return { content: [{ type: "text" as const, text: "Playbook not found." }] };
       }
 
+      const [activeVer] = await db
+        .select({ id: playbookVersion.id })
+        .from(playbookVersion)
+        .where(and(eq(playbookVersion.playbookId, playbookId), eq(playbookVersion.isActive, true)))
+        .limit(1);
+
+      const prevCategories = activeVer
+        ? await db
+            .select()
+            .from(playbookCategory)
+            .where(eq(playbookCategory.playbookVersionId, activeVer.id))
+        : [];
+
+      const prevItems = prevCategories.length
+        ? await db
+            .select()
+            .from(playbookItem)
+            .where(
+              inArray(
+                playbookItem.categoryId,
+                prevCategories.map((c) => c.id)
+              )
+            )
+        : [];
+
       await db
         .update(playbookVersion)
         .set({ isActive: false })
@@ -187,11 +212,39 @@ export function registerPlaybookTools(server: McpServer, userId: string) {
         })
         .returning();
 
+      if (prevCategories.length) {
+        for (const cat of prevCategories) {
+          const [newCat] = await db
+            .insert(playbookCategory)
+            .values({ playbookVersionId: ver.id, name: cat.name, frameworkRef: cat.frameworkRef })
+            .returning();
+          const catItems = prevItems.filter((i) => i.categoryId === cat.id);
+          if (catItems.length) {
+            await db.insert(playbookItem).values(
+              catItems.map((i) => ({
+                categoryId: newCat.id,
+                name: i.name,
+                description: i.description,
+                defaultRemediation: i.defaultRemediation,
+                defaultRisk: i.defaultRisk,
+                displayOrder: i.displayOrder,
+                active: i.active,
+              }))
+            );
+          }
+        }
+      }
+
+      const clonedNote =
+        prevCategories.length > 0
+          ? ` (cloned ${prevCategories.length} categories and ${prevItems.length} items from previous version)`
+          : " (no previous content to clone)";
+
       return {
         content: [
           {
             type: "text" as const,
-            text: `Created version ${version} for playbook [${playbookId}]\nVersion ID: ${ver.id} (draft, active)`,
+            text: `Created version ${version} for playbook [${playbookId}]${clonedNote}\nVersion ID: ${ver.id} (draft, active)`,
           },
         ],
       };
