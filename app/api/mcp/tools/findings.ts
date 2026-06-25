@@ -2,6 +2,7 @@ import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { finding, findingVersion, project } from "@/db/schema";
+import { getStorage } from "@/lib/storage";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 const RiskLevel = z.enum(["high", "medium", "low", "informational"]);
@@ -358,6 +359,93 @@ export function registerFindingTools(server: McpServer, userId: string) {
           {
             type: "text" as const,
             text: `Appended evidence note to finding [${findingId}]${label ? ` (${label})` : ""}.`,
+          },
+        ],
+      };
+    }
+  );
+
+  server.registerTool(
+    "upload_evidence",
+    {
+      description:
+        "Upload an image or file as evidence for a finding. Accepts base64-encoded content, stores it in blob storage, and appends a markdown image reference to the finding description. Use this to attach screenshots, Burp captures, or other visual evidence.",
+      inputSchema: {
+        findingId: z.string().uuid().describe("The finding ID"),
+        filename: z
+          .string()
+          .describe("Original filename including extension, e.g. 'screenshot.png'"),
+        mimeType: z
+          .enum([
+            "image/jpeg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            "image/svg+xml",
+            "application/pdf",
+          ])
+          .describe("MIME type of the file"),
+        base64Data: z.string().describe("Base64-encoded file content (no data URI prefix)"),
+        caption: z
+          .string()
+          .optional()
+          .describe("Optional caption shown under the image in the finding"),
+      },
+    },
+    async ({ findingId, filename, mimeType, base64Data, caption }) => {
+      const [row] = await db
+        .select({ f: finding, projectId: finding.projectId, userId: project.userId })
+        .from(finding)
+        .innerJoin(project, eq(finding.projectId, project.id))
+        .where(and(eq(finding.id, findingId), eq(project.userId, userId)))
+        .limit(1);
+
+      if (!row) {
+        return { content: [{ type: "text" as const, text: "Finding not found." }] };
+      }
+
+      let buffer: Buffer;
+      try {
+        buffer = Buffer.from(base64Data, "base64");
+      } catch {
+        return { content: [{ type: "text" as const, text: "Invalid base64 data." }] };
+      }
+
+      if (buffer.length > 10 * 1024 * 1024) {
+        return { content: [{ type: "text" as const, text: "File exceeds 10 MB limit." }] };
+      }
+
+      const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const storagePath = `evidence/${row.projectId}/${findingId}/${Date.now()}-${safeName}`;
+      const blob = await getStorage().put(storagePath, buffer, mimeType);
+
+      const [latest] = await db
+        .select()
+        .from(findingVersion)
+        .where(eq(findingVersion.findingId, findingId))
+        .orderBy(desc(findingVersion.createdAt))
+        .limit(1);
+
+      const imageRef = caption
+        ? `\n\n![${caption}](${blob.url})\n*${caption}*`
+        : `\n\n![${safeName}](${blob.url})`;
+
+      await db.insert(findingVersion).values({
+        findingId,
+        title: latest?.title ?? row.f.title,
+        riskLevel: latest?.riskLevel ?? row.f.riskLevel,
+        status: latest?.status ?? row.f.status,
+        description: (latest?.description ?? "") + imageRef,
+        remediation: latest?.remediation ?? null,
+        cvssScore: latest?.cvssScore ?? null,
+        authorType: "ai",
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Uploaded evidence to finding [${findingId}].\nURL: ${blob.url}`,
           },
         ],
       };
