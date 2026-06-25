@@ -1,3 +1,9 @@
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+# shellcheck disable=SC1090
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+nvm use --silent 2>/dev/null || true
+
 pnpm format:check
 pnpm type-check
+pnpm test:unit
 pnpm build
