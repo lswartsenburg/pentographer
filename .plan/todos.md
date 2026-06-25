@@ -44,6 +44,19 @@
 - [x] Create external GraphQL API
 - [x] Create an MCP
 - [x] AI features take a long time and there is no indication of progress aside from a spinner
+- [x] Change report export log to "Activites" where users can see the entire audit log for a project
+- [ ] Actually implement the local storage solution. It's not showing in docker-compose.yml. Run it and verify it works
+- [ ] Verify playbook management in an org
+- [ ] Instead of using the Anthropic API key set in an env variable, users should be able to set up their own keys on a user account, and on a organization level. If an organization doesn't have a key, the user key should be used. If none are available, we can use the api key set on the env variable, but we should restrict how many prompts can be send using that
+- [x] I still don't see hte system playbook OWASP in ALice's account. Make sure that testing if the system playbooks exist is part of the manual  
+       testing
+- [x] Pointer doesn't change on the left bottom dropdown
+- [x] Clicking on the logo should go to the dashboard of the currently active project
+- [ ] What happens if the owner of a project quits an organization?
+- [x] Organization name appears in user settings instead of organization settings (doesn't exist yet). What should happen to API keys and OAuth?
+- [x] Why are we using "Workspace" in parts of the UI? We should either standardize on "Organization" or "Workspace"
+- [x] Add by email form is misaligned on members page
+- [x] When you open user settings, should the left sidebar still show? It sesm that everything in the left sidebar is organization level
 
 # Three deployment tiers (corporations are reluctant to use a cloud version with sensitive pentest data)
 
