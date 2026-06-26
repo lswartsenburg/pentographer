@@ -12,6 +12,7 @@ const schema = createSchema<GraphQLContext>({ typeDefs, resolvers });
 const yoga = createYoga<ServerContext, GraphQLContext>({
   schema,
   graphqlEndpoint: "/api/graphql",
+  graphiql: true,
   context: ({ userId, orgId }): GraphQLContext => ({ userId, orgId }),
 });
 
