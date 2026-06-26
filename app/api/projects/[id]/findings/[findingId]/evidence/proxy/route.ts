@@ -63,7 +63,13 @@ export async function GET(
   // These types are safe to display inline in an <img> tag. Everything else
   // (SVG, HTML, XML, unknown) forces a download so it can't execute in the
   // app's origin if a user navigates to the proxy URL directly.
-  const SAFE_INLINE = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]);
+  const SAFE_INLINE = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+  ]);
   const baseType = contentType.split(";")[0].trim();
   const attachment = !SAFE_INLINE.has(baseType);
 
