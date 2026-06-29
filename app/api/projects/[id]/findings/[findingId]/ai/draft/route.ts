@@ -77,6 +77,66 @@ async function getOwnedFinding(userId: string, projectId: string, findingId: str
   return { finding: row, projectName: proj.name };
 }
 
+// State machine that extracts description/remediation tokens from streaming tool-call JSON.
+//
+// The model streams a JSON object: {"description":"VALUE1","remediation":"VALUE2"}
+// Counting unescaped quote characters:
+//   quote #1 opens the "description" key
+//   quote #2 closes the "description" key
+//   quote #3 opens the description VALUE  ← forward chars to description
+//   quote #4 closes the description VALUE
+//   quote #5 opens the "remediation" key
+//   quote #6 closes the "remediation" key
+//   quote #7 opens the remediation VALUE  ← forward chars to remediation
+//   quote #8 closes the remediation VALUE
+interface JsonStreamState {
+  quoteCount: number;
+  escaped: boolean;
+}
+
+function unescapeJsonChar(ch: string): string {
+  switch (ch) {
+    case "n":
+      return "\n";
+    case "t":
+      return "\t";
+    case "r":
+      return "";
+    case '"':
+      return '"';
+    case "\\":
+      return "\\";
+    default:
+      return ch;
+  }
+}
+
+function extractTokens(
+  chunk: string,
+  state: JsonStreamState
+): { descToken: string; remToken: string } {
+  let descToken = "";
+  let remToken = "";
+
+  for (const ch of chunk) {
+    if (state.escaped) {
+      state.escaped = false;
+      const unescaped = unescapeJsonChar(ch);
+      if (state.quoteCount === 3) descToken += unescaped;
+      else if (state.quoteCount === 7) remToken += unescaped;
+    } else if (ch === "\\" && (state.quoteCount === 3 || state.quoteCount === 7)) {
+      state.escaped = true;
+    } else if (ch === '"') {
+      state.quoteCount++;
+    } else {
+      if (state.quoteCount === 3) descToken += ch;
+      else if (state.quoteCount === 7) remToken += ch;
+    }
+  }
+
+  return { descToken, remToken };
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; findingId: string }> }
@@ -156,7 +216,6 @@ export async function POST(
     imageKeys.push(item.key);
   }
 
-  // Build the text prompt
   // notes = tester's raw unsaved text; fall back to saved description if notes not provided
   const testerNotes = notes?.trim() || latestVersion?.description?.trim() || null;
   const savedRemediation = latestVersion?.remediation?.trim() || null;
@@ -194,7 +253,10 @@ Risk level: ${f.riskLevel}${playbookContext}`;
   return makeSSE(async (send) => {
     send({ status: "Drafting finding…" });
     try {
-      const message = await client.messages.create({
+      const parseState: JsonStreamState = { quoteCount: 0, escaped: false };
+      let accumulatedJson = "";
+
+      const stream = client.messages.stream({
         model: AI_MODEL,
         max_tokens: 2048,
         tools: [DRAFT_TOOL],
@@ -202,16 +264,26 @@ Risk level: ${f.riskLevel}${playbookContext}`;
         messages: [{ role: "user", content: userContent }],
       });
 
-      const block = message.content.find((b) => b.type === "tool_use");
-      if (!block || block.type !== "tool_use") {
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "input_json_delta") {
+          const chunk = event.delta.partial_json;
+          accumulatedJson += chunk;
+          const { descToken, remToken } = extractTokens(chunk, parseState);
+          if (descToken) send({ field: "description", token: descToken });
+          if (remToken) send({ field: "remediation", token: remToken });
+        }
+      }
+
+      let description: string;
+      let remediation: string;
+      try {
+        const parsed = JSON.parse(accumulatedJson) as { description: string; remediation: string };
+        description = parsed.description;
+        remediation = parsed.remediation;
+      } catch {
         send({ error: "AI returned an unexpected response format. Please try again." });
         return;
       }
-
-      const { description, remediation } = block.input as {
-        description: string;
-        remediation: string;
-      };
 
       send({ status: "Saving…" });
 

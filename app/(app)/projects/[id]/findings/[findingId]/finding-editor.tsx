@@ -287,6 +287,12 @@ export function FindingEditor({
             );
             return;
           }
+          if (event.token) {
+            const field = event.field as string;
+            const token = event.token as string;
+            if (field === "description") setDescription((prev) => prev + token);
+            else if (field === "remediation") setRemediation((prev) => prev + token);
+          }
           if (event.done) {
             setDescription((event.description as string) ?? "");
             setRemediation((event.remediation as string) ?? "");
